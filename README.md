@@ -1,4 +1,4 @@
-InnoVet: Veterinary Disease Prediction System
+## InnoVet: Veterinary Disease Prediction System
 
 A veterinary web application that assists pet owners and veterinarians by predicting possible pet diseases using Machine Learning. The system provides disease predictions based on pet symptoms and helps improve the efficiency of preliminary diagnosis.
 
