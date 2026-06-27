@@ -4,7 +4,7 @@ A veterinary web application that assists pet owners and veterinarians by predic
 
 ---
 
-## 📖 Overview
+##  Overview
 
 InnoVet is a web application that combines Artificial Intelligence and modern web technologies to support veterinary healthcare.
 
@@ -14,19 +14,19 @@ This project was developed as a capstone project to demonstrate the practical ap
 
 ---
 
-## ✨ Features
+## Features
 
-- 🐶 Pet disease prediction using Machine Learning
-- 📋 Pet information management
-- 📊 Disease prediction confidence scores
-- 🔍 Veterinary disease database
-- 👨‍⚕️ User-friendly dashboard
-- 🌐 REST API integration
-- 📱 Responsive web interface
+-  Pet disease prediction using Machine Learning
+-  Pet information management
+-  Disease prediction confidence scores
+-  Veterinary disease database
+-  User-friendly dashboard
+-  REST API integration
+-  Responsive web interface
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend
 - React.js
@@ -56,7 +56,7 @@ This project was developed as a capstone project to demonstrate the practical ap
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 ```text
 innovet/
@@ -72,7 +72,7 @@ innovet/
 
 ---
 
-## ⚙️ Installation
+##  Installation
 
 ### 1. Clone the repository
 
@@ -113,7 +113,7 @@ npm start
 
 ---
 
-## 🤖 Machine Learning
+##  Machine Learning
 
 The project utilizes trained machine learning models for disease prediction.
 
@@ -128,7 +128,7 @@ The workflow includes:
 
 ---
 
-## 📊 Dataset
+##  Dataset
 
 The machine learning models were trained using veterinary disease datasets containing:
 
