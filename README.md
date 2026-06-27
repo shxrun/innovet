@@ -61,7 +61,7 @@ This project was developed as a capstone project to demonstrate the practical ap
 ```text
 innovet/
 │
-├── frontend/               # React Frontend
+├── frontend/               # Vue Frontend
 ├── ml-backend/             # Django Backend
 ├── chatbot-backend/        # AI Chatbot Backend
 ├── functions/              # Backend utilities
