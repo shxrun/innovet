@@ -1,56 +1,88 @@
 <!-- components/common/NotificationPanel.vue -->
 <template>
-  <Transition name="slide-fade">
+  <Transition 
+    :name="isRightPanel ? 'slide-right' : 'slide-left'"
+    enter-active-class="transition-all duration-300 ease-out"
+    leave-active-class="transition-all duration-300 ease-in"
+    enter-from-class="opacity-0 transform translate-x-6"
+    leave-to-class="opacity-0 transform translate-x-6"
+  >
     <div 
       v-if="isVisible"
       class="bg-white overflow-hidden z-30 transition-all duration-300 ease-in-out flex flex-col fixed"
       :class="[
         isMobileView 
-          ? 'inset-0 pt-14 pb-20' 
-          : 'left-20 top-4 h-[calc(100vh-2rem)] w-[400px] border border-gray-100 rounded-2xl shadow-sm'
+          ? 'inset-0 -mt-1 pb-20' 
+          : desktopPositionClass
       ]"
     >
       <!-- Notification Detail View -->
       <div v-if="selectedNotification" class="flex flex-col h-full">
-        <div class="p-6 flex justify-between items-center border-b">
+        <div :class="['flex justify-between items-center border-b', isMobileView ? 'p-4' : 'p-6']">
           <button 
             @click="closeNotificationDetail"
             class="flex items-center text-gray-600 hover:text-gray-800"
           >
-            <ArrowLeftIcon class="w-5 h-5 mr-2" />
-            <span>Back to notifications</span>
+            <ArrowLeftIcon :class="[isMobileView ? 'w-4 h-4' : 'w-5 h-5', 'mr-2']" />
+            <span :class="[isMobileView ? 'text-sm' : '']">Back to notifications</span>
           </button>
         </div>
         
-        <div class="p-6 overflow-y-auto flex-grow">
-          <div class="mb-6">
+        <div :class="['overflow-y-auto flex-grow', isMobileView ? 'p-4' : 'p-6']">
+          <div :class="[isMobileView ? 'mb-4' : 'mb-6']">
             <div 
               :class="[
-                'w-12 h-12 rounded-full flex items-center justify-center mb-4',
+                'rounded-full flex items-center justify-center',
+                isMobileView ? 'w-10 h-10 mb-3' : 'w-12 h-12 mb-4',
                 getNotificationColor(selectedNotification.type)
               ]"
             >
-              <component :is="getNotificationIcon(selectedNotification.type)" class="w-6 h-6" />
+              <component :is="getNotificationIcon(selectedNotification.type)" :class="[isMobileView ? 'w-5 h-5' : 'w-6 h-6']" />
             </div>
             
-            <h2 class="text-xl font-semibold mb-2">{{ selectedNotification.title }}</h2>
-            <p class="text-sm text-gray-500 mb-4">{{ formatDate(selectedNotification.date) }}</p>
+            <h2 :class="['font-semibold mb-2', isMobileView ? 'text-lg' : 'text-xl']">{{ selectedNotification.title }}</h2>
+            <p :class="['text-gray-500', isMobileView ? 'text-xs mb-3' : 'text-sm mb-4']">{{ formatDate(selectedNotification.date) }}</p>
             
-            <div class="prose max-w-none">
+            <div :class="['prose max-w-none border border-gray-200 rounded-lg bg-gray-50', isMobileView ? 'text-sm p-3' : 'p-4']">
               <p>{{ selectedNotification.description }}</p>
               
+
+              
               <!-- Additional content if available -->
-              <div v-if="selectedNotification.content" class="mt-4">
+              <div v-if="selectedNotification.content" :class="[isMobileView ? 'mt-3' : 'mt-4']">
                 <p>{{ selectedNotification.content }}</p>
               </div>
               
-              <!-- Action buttons if needed -->
-              <div v-if="selectedNotification.actionUrl" class="mt-6">
+              <!-- Action button (vet side only) -->
+              <div v-if="showActionButton" :class="[isMobileView ? 'mt-4' : 'mt-6']">
                 <button 
                   @click="handleActionClick(selectedNotification)"
-                  class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                  :class="['bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition', isMobileView ? 'px-3 py-1.5 text-sm' : 'px-4 py-2']"
                 >
                   View Details
+                </button>
+              </div>
+
+              <!-- Feedback and Follow-up options for completed appointments (user side only) -->
+              <div v-if="showFeedbackOptions" :class="[isMobileView ? 'mt-4 space-y-2' : 'mt-6 space-y-3']">
+                <h4 :class="['font-medium text-gray-700', isMobileView ? 'text-xs' : 'text-sm']">What would you like to do next?</h4>
+                
+                <!-- Feedback button -->
+                <button 
+                  @click="openFeedback(selectedNotification)"
+                  :class="['w-full bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 flex items-center justify-center', isMobileView ? 'px-3 py-1.5 text-sm' : 'px-4 py-2']"
+                >
+                  <MessageCircleIcon :class="[isMobileView ? 'w-3.5 h-3.5' : 'w-4 h-4', 'mr-2']" />
+                  Leave Feedback
+                </button>
+                
+                <!-- Follow-up button -->
+                <button 
+                  @click="scheduleFollowUp(selectedNotification)"
+                  :class="['w-full bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-200 flex items-center justify-center', isMobileView ? 'px-3 py-1.5 text-sm' : 'px-4 py-2']"
+                >
+                  <CalendarIcon :class="[isMobileView ? 'w-3.5 h-3.5' : 'w-4 h-4', 'mr-2']" />
+                  Schedule Follow-up
                 </button>
               </div>
             </div>
@@ -61,57 +93,68 @@
       <!-- Notification List View -->
       <div v-else class="flex flex-col h-full">
         <!-- Notification Header -->
-        <div class="p-6 flex justify-between items-center">
-          <h2 class="text-xl font-semibold">Notifications</h2>
-          <button 
-            v-if="isMobileView"
-            @click="closeNotifications"
-            class="text-gray-400 hover:text-gray-600"
-          >
-            <XIcon class="w-6 h-6" />
-          </button>
+        <div :class="['flex justify-between items-center', isMobileView ? 'p-4' : 'p-6']">
+          <h2 :class="['font-semibold', isMobileView ? 'text-lg' : 'text-xl']">Notifications</h2>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="markAllAsRead"
+              :disabled="loading || !hasUnreadNotifications"
+              :class="['flex items-center rounded-full border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed', isMobileView ? 'gap-1 text-xs px-2 py-1' : 'gap-2 text-sm px-3 py-1.5']"
+              title="Mark all as read"
+            >
+              <CheckCircleIcon :class="['text-blue-600', isMobileView ? 'w-3 h-3' : 'w-4 h-4']" />
+              <span class="hidden sm:inline">Mark all as read</span>
+            </button>
+            <button 
+              v-if="isMobileView"
+              @click="closeNotifications"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              <XIcon :class="[isMobileView ? 'w-5 h-5' : 'w-6 h-6']" />
+            </button>
+          </div>
         </div>
 
         <!-- Notification Filters -->
-        <div class="px-6 flex space-x-4 mb-2">
+        <div :class="['flex mb-2', isMobileView ? 'px-4 space-x-3' : 'px-6 space-x-4']">
           <button 
             @click="setFilter('all')"
-            :class="['px-3 py-1 rounded-full text-sm font-medium', filterType === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-500']"
+            :class="['rounded-full font-medium', filterType === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-500', isMobileView ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm']"
           >
             All
           </button>
           <button 
             @click="setFilter('unread')"
-            :class="['px-3 py-1 rounded-full text-sm font-medium', filterType === 'unread' ? 'bg-blue-100 text-blue-700' : 'text-gray-500']"
+            :class="['rounded-full font-medium', filterType === 'unread' ? 'bg-blue-100 text-blue-700' : 'text-gray-500', isMobileView ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm']"
           >
             Unread
           </button>
           <button 
             @click="refreshNotifications"
-            class="px-3 py-1 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100"
+            :class="['rounded-full font-medium text-gray-500 hover:bg-gray-100', isMobileView ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm']"
             :disabled="isRefreshing"
           >
-            <RefreshCwIcon v-if="!isRefreshing" class="w-4 h-4" />
-            <LoaderIcon v-else class="w-4 h-4 animate-spin" />
+            <RefreshCwIcon v-if="!isRefreshing" :class="[isMobileView ? 'w-3 h-3' : 'w-4 h-4']" />
+            <LoaderIcon v-else :class="[isMobileView ? 'w-3 h-3' : 'w-4 h-4', 'animate-spin']" />
           </button>
         </div>
 
         <!-- Notification Filter & Mark All as Read Button -->
-        <div class="p-6 relative flex items-center space-x-2">
+        <div :class="['relative flex items-center space-x-2', isMobileView ? 'p-4' : 'p-6']">
           <div class="relative w-full">
             <input 
               type="text"
               placeholder="Search notifications"
               v-model="filterQuery"
-              class="w-full bg-gray-100 rounded-lg py-2 px-4 pr-10 focus:outline-none"
+              :class="['w-full bg-gray-100 rounded-lg focus:outline-none', isMobileView ? 'py-1.5 px-3 pr-8 text-sm' : 'py-2 px-4 pr-10']"
               @input="handleFilterInput"
             />
             <button 
               v-if="filterQuery"
               @click="clearFilter"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              :class="['absolute top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600', isMobileView ? 'right-2' : 'right-3']"
             >
-              <XIcon class="w-5 h-5" />
+              <XIcon :class="[isMobileView ? 'w-4 h-4' : 'w-5 h-5']" />
             </button>
           </div>
           <button 
@@ -119,62 +162,89 @@
             class="text-blue-500 hover:underline"
             :disabled="loading || !hasUnreadNotifications"
           >
-            <Icon icon="mdi:bell-check-outline" width="24" height="24" :style="{ color: hasUnreadNotifications ? '#3b82f6' : '#94a3b8' }" />
+            <Icon icon="mdi:bell-check-outline" :width="isMobileView ? '20' : '24'" :height="isMobileView ? '20' : '24'" :style="{ color: hasUnreadNotifications ? '#3b82f6' : '#94a3b8' }" />
           </button>
         </div>
 
         <!-- Notification List -->
-        <div class="px-6 overflow-y-auto flex-grow">
+        <div :class="['overflow-y-auto flex-grow', isMobileView ? 'px-4' : 'px-6']">
           <div class="flex justify-between items-center mb-3">
-            <h3 class="text-sm font-semibold">Recent Notifications</h3>
-            <span v-if="loading || isRefreshing" class="text-xs text-gray-500">
-              {{ isRefreshing ? 'Refreshing...' : 'Loading...' }}
-            </span>
+            <h3 :class="['font-semibold', isMobileView ? 'text-xs' : 'text-sm']">Recent Notifications</h3>
+            <div class="flex items-center gap-2">
+              <button 
+                @click="refreshNotifications"
+                class="text-xs text-blue-600 hover:text-blue-800 p-1"
+                title="Refresh notifications"
+              >
+                <RefreshCwIcon :class="[isMobileView ? 'w-2.5 h-2.5' : 'w-3 h-3']" />
+              </button>
+              <span v-if="loading || isRefreshing" class="text-xs text-gray-500">
+                {{ isRefreshing ? 'Refreshing...' : 'Loading...' }}
+              </span>
+            </div>
           </div>
           
-          <div v-if="filteredNotifications.length > 0">
+          <div v-if="filteredNotifications && filteredNotifications.length > 0">
             <div 
               v-for="notification in filteredNotifications" 
               :key="notification.id"
               :class="[
-                'mb-3 p-3 rounded-lg hover:bg-gray-50 flex items-start cursor-pointer',
-                { 'bg-blue-50': !notification.read }
+                'rounded-lg hover:bg-gray-50 flex items-start cursor-pointer',
+                { 'bg-blue-50': !notification.read },
+                isMobileView ? 'mb-2 p-2.5' : 'mb-3 p-3'
               ]"
               @click="handleNotificationClick(notification)"
             >
-              <div 
-                :class="[
-                  'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
-                  'aspect-square',
-                  getNotificationColor(notification.type)
-                ]"
-                class="mr-5" 
-              >
-                <component :is="getNotificationIcon(notification.type)" class="w-5 h-5" />
+              <div :class="['relative', isMobileView ? 'mr-3' : 'mr-5']">
+                <div 
+                  :class="[
+                    'rounded-full flex items-center justify-center shrink-0',
+                    isMobileView ? 'w-8 h-8' : 'w-10 h-10',
+                    'aspect-square',
+                    getNotificationColor(notification.type)
+                  ]"
+                >
+                  <component :is="getNotificationIcon(notification.type)" :class="[isMobileView ? 'w-4 h-4' : 'w-5 h-5']" />
+                </div>
+                <!-- Status badge overlay for appointment notifications -->
+                <div v-if="notification.type==='appointment'" :class="['absolute -bottom-1 -right-1 rounded-full border-2 border-white flex items-center justify-center', isMobileView ? 'w-4 h-4' : 'w-5 h-5', getAppointmentStatusColor(notification)]">
+                  <component :is="getAppointmentStatusIcon(notification)" :class="[isMobileView ? 'w-2.5 h-2.5' : 'w-3 h-3']" />
+                </div>
               </div>
               <div class="flex-grow">
-                <div class="font-medium">{{ notification.title }}</div>
-                <div class="text-sm text-gray-500">{{ notification.description }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ formatDate(notification.date) }}</div>
+                <div :class="['font-medium', isMobileView ? 'text-sm' : '']">{{ notification.title }}</div>
+                <div :class="['text-gray-500', isMobileView ? 'text-xs' : 'text-sm']">{{ notification.description }}</div>
+                
+                <!-- Additional details for appointment reminders -->
+                <div v-if="notification.type === 'appointment_reminder'" :class="['text-blue-600', isMobileView ? 'text-xs mt-0.5' : 'text-sm mt-1']">
+                  <span v-if="notification.appointmentTime || notification.time">
+                    🕒 {{ notification.appointmentTime || notification.time }}
+                  </span>
+                  <span v-if="notification.petNames || notification.petName" class="ml-2">
+                    🐾 {{ notification.petNames?.join(', ') || notification.petName }}
+                  </span>
+                </div>
+                
+                <div :class="['text-gray-400', isMobileView ? 'text-xs mt-0.5' : 'text-sm mt-1']">{{ formatDate(notification.date) }}</div>
               </div>
               <button 
                 @click.stop="deleteNotification(notification.id)"
                 class="text-gray-400 hover:text-red-500 p-1"
                 title="Delete notification"
               >
-                <TrashIcon class="w-4 h-4" />
+                <TrashIcon :class="[isMobileView ? 'w-3.5 h-3.5' : 'w-4 h-4']" />
               </button>
             </div>
           </div>
-          <div v-else-if="loading" class="py-10 text-center">
+          <div v-else-if="loading" :class="['text-center', isMobileView ? 'py-6' : 'py-10']">
             <div class="animate-pulse flex flex-col items-center">
-              <div class="rounded-full bg-gray-200 h-12 w-12 mb-4"></div>
-              <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div class="h-3 bg-gray-200 rounded w-1/2"></div>
+              <div :class="['rounded-full bg-gray-200 mb-3', isMobileView ? 'h-8 w-8' : 'h-12 w-12']"></div>
+              <div :class="['bg-gray-200 rounded w-3/4 mb-2', isMobileView ? 'h-3' : 'h-4']"></div>
+              <div :class="['bg-gray-200 rounded w-1/2', isMobileView ? 'h-2' : 'h-3']"></div>
             </div>
           </div>
-          <div v-else class="py-10 text-center text-gray-500 text-sm">
-            <Icon icon="mdi:bell-off-outline" class="w-12 h-12 mx-auto mb-2 text-gray-300" />
+          <div v-else :class="['text-center text-gray-500', isMobileView ? 'py-6 text-sm' : 'py-10 text-sm']">
+            <Icon icon="mdi:bell-off-outline" :class="['mx-auto mb-2 text-gray-300', isMobileView ? 'w-8 h-8' : 'w-12 h-12']" />
             {{ filterQuery ? 'No notifications found.' : 'No recent notifications.' }}
           </div>
         </div>
@@ -195,26 +265,44 @@ import {
   ArrowLeftIcon,
   RefreshCwIcon,
   LoaderIcon,
-  Trash as TrashIcon
+  Trash as TrashIcon,
+  Clock as ClockIcon,
+  XCircle as XCircleIcon,
+  Ban as BanIcon,
+  ArrowLeftRight as ArrowLeftRightIcon,
+  MessageCircle as MessageCircleIcon
 } from 'lucide-vue-next';
 import { useNotificationsStore } from '../../stores/modules/notifications';
-import { useRouter } from 'vue-router';
+import { useAuthStore } from '../../stores/modules/authStore';
+import { useRouter, useRoute } from 'vue-router';
 
 const props = defineProps({
-  isMobileView: {
-    type: Boolean,
-    default: false
-  },
-  isVisible: {
-    type: Boolean,
-    default: false
-  }
+  isMobileView: { type: Boolean, default: false },
+  isVisible: { type: Boolean, default: false },
+  // New: control side/offset for desktop
+  isRightPanel: { type: Boolean, default: false },
+  topOffset: { type: String, default: 'top-4' },
+  widthClass: { type: String, default: 'w-[400px]' },
+  leftOffset: { type: String, default: 'left-20' },
+  rightOffset: { type: String, default: 'right-4' },
+  heightClass: { type: String, default: 'h-[calc(100vh-2rem)]' },
+  // whether to show the "View Details" action button (vet side)
+  showActionButton: { type: Boolean, default: false },
+  // explicit vet context (overrides role check)
+  isVetContext: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['close']);
+// Desktop positioning class
+const desktopPositionClass = computed(() => {
+  const side = props.isRightPanel ? props.rightOffset : props.leftOffset;
+  return `${side} ${props.topOffset} ${props.heightClass} ${props.widthClass} border border-gray-100 rounded-2xl shadow-sm`;
+});
 
 const router = useRouter();
+const route = useRoute();
 const notificationsStore = useNotificationsStore();
+const authStore = useAuthStore();
 const filterQuery = ref('');
 const isFiltering = ref(false);
 const filterStatus = ref('');
@@ -226,7 +314,15 @@ const isRefreshing = ref(false);
 // Computed properties
 const loading = computed(() => notificationsStore.loading);
 const filteredNotifications = computed(() => {
-  return notificationsStore.getFilteredNotifications(filterType.value, filterQuery.value);
+  const filtered = notificationsStore.getFilteredNotifications(filterType.value, filterQuery.value);
+  // console.log('Filtered notifications computed:', {
+  //   filterType: filterType.value,
+  //   filterQuery: filterQuery.value,
+  //   totalNotifications: notificationsStore.notifications.length,
+  //   filteredCount: filtered.length,
+  //   filteredNotifications: filtered
+  // });
+  return filtered;
 });
 
 // Add this computed property to watch for changes in the notifications array
@@ -294,6 +390,8 @@ const getNotificationColor = (type) => {
   switch (type) {
     case 'appointment':
       return 'bg-blue-100 text-blue-500';
+    case 'appointment_reminder':
+      return 'bg-orange-100 text-orange-500';
     case 'telehealth':
       return 'bg-green-100 text-green-500';
     case 'reminder':
@@ -313,6 +411,8 @@ const getNotificationIcon = (type) => {
   switch (type) {
     case 'appointment':
       return CalendarIcon;
+    case 'appointment_reminder':
+      return ClockIcon;
     case 'telehealth':
       return CheckCircleIcon;
     case 'reminder':
@@ -321,6 +421,50 @@ const getNotificationIcon = (type) => {
       return AlertCircleIcon;
     case 'welcome':
       return BellIcon;
+    default:
+      return BellIcon;
+  }
+};
+
+// Derive appointment status color/icon
+const extractAppointmentStatus = (n) => {
+  return (n?.status || n?.data?.status || '').toString().toLowerCase();
+};
+
+const getAppointmentStatusColor = (n) => {
+  const s = extractAppointmentStatus(n);
+  switch (s) {
+    case 'approved':
+      return 'bg-green-500 text-white';
+    case 'pending':
+      return 'bg-yellow-500 text-white';
+    case 'rejected':
+      return 'bg-red-500 text-white';
+    case 'completed':
+      return 'bg-blue-500 text-white';
+    case 'cancelled':
+      return 'bg-gray-500 text-white';
+    case 'expired':
+      return 'bg-orange-500 text-white';
+    default:
+      return 'bg-slate-400 text-white';
+  }
+};
+
+const getAppointmentStatusIcon = (n) => {
+  const s = extractAppointmentStatus(n);
+  switch (s) {
+    case 'approved':
+    case 'completed':
+      return CheckCircleIcon;
+    case 'pending':
+      return ClockIcon;
+    case 'rejected':
+      return XCircleIcon;
+    case 'cancelled':
+      return BanIcon;
+    case 'expired':
+      return AlertCircleIcon;
     default:
       return BellIcon;
   }
@@ -341,16 +485,50 @@ const closeNotificationDetail = () => {
 };
 
 const handleActionClick = (notification) => {
+  // If explicit URL provided, use it
   if (notification.url) {
+    const targetUrl = notification.url;
     closeNotifications();
-    router.push(notification.url);
+    setTimeout(() => router.push(targetUrl), 0);
+    return;
+  }
+
+  // Smart routing by type/status (appointment → user or vet side)
+  const type = (notification.type || notification.data?.type || '').toLowerCase();
+  const status = (notification.status || notification.data?.status || '').toLowerCase();
+  const appointmentId = notification.appointmentId || notification.data?.appointmentId || notification.data?.id;
+
+  if (type === 'appointment' || appointmentId) {
+    // If current user is a vet, go to vet approval; otherwise, user notifications page
+    const isVet = props.isVetContext || (authStore.user?.role || authStore.user?.userType || '').toLowerCase().includes('vet');
+    if (isVet) {
+      const targetByName = { name: 'vetappointmentapproval', query: appointmentId ? { focus: String(appointmentId) } : {} };
+      const targetByPath = { path: '/vet/appointments/vetappointmentapproval', query: appointmentId ? { focus: String(appointmentId) } : {} };
+      closeNotifications();
+      setTimeout(() => {
+        router.push(targetByName).catch(() => router.push(targetByPath)).catch(() => {});
+      }, 30);
+      // Attempt to scroll/focus after small delay
+      setTimeout(() => {
+        try {
+          const el = document.getElementById(`appt-${appointmentId}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) {}
+      }, 800);
+    } else {
+      closeNotifications();
+      setTimeout(() => {
+        router.push({ name: 'Notifications' }).catch(() => router.push('/user/notifications')).catch(() => {});
+      }, 30);
+    }
+    return;
   }
 };
 
 const markAllAsRead = async () => {
   if (!hasUnreadNotifications.value) return;
   
-  const user = window.currentUser || null;
+  const user = authStore.user || null;
   if (user && user.userId) {
     await notificationsStore.markAllAsRead(user.userId);
   }
@@ -360,7 +538,7 @@ const refreshNotifications = async () => {
   if (isRefreshing.value) return;
   
   isRefreshing.value = true;
-  const user = window.currentUser || null;
+  const user = authStore.user || null;
   
   if (user && user.userId) {
     try {
@@ -398,21 +576,23 @@ const deleteNotification = async (notificationId) => {
 
 // Lifecycle hooks
 onMounted(async () => {
-  const user = window.currentUser || null;
+  const user = authStore.user || null;
   
   if (user && user.userId) {
     // Set up a small delay to let the animation complete first
     setTimeout(async () => {
-      console.log('Attempting to fetch notifications for user:', user.userId);
+      // console.log('Attempting to fetch notifications for user:', user.userId);
       
       try {
         await notificationsStore.fetchNotifications(user.userId);
-        console.log('Notifications fetched successfully');
+        // console.log('Notifications fetched successfully');
+        // console.log('Current notifications in store:', notificationsStore.notifications);
+        // console.log('Filtered notifications:', filteredNotifications.value);
       } catch (error) {
-        console.error('Error fetching notifications:', error);
+        // console.error('Error fetching notifications:', error);
         
         if (error.message && error.message.includes('requires an index')) {
-          console.warn('Firestore index required. Please create the index using the link in the error message above.');
+          // console.warn('Firestore index required. Please create the index using the link in the error message above.');
         }
       }
       
@@ -420,11 +600,11 @@ onMounted(async () => {
       try {
         unsubscribe.value = notificationsStore.subscribeToNotifications(user.userId);
       } catch (error) {
-        console.error('Error setting up notifications subscription:', error);
+        // console.error('Error setting up notifications subscription:', error);
       }
     }, 300); // 300ms matches the transition duration
   } else {
-    console.warn('No user found or user ID missing. Cannot fetch notifications.');
+    // console.warn('No user found or user ID missing. Cannot fetch notifications.');
   }
 });
 
@@ -439,19 +619,26 @@ onUnmounted(() => {
 // Watch for visibility changes to refresh notifications
 watch(() => props.isVisible, (newValue) => {
   if (newValue) {
+    // console.log('Notification panel became visible, refreshing notifications...');
     // Reset selected notification when panel is opened
     selectedNotification.value = null;
     
     // Fetch notifications immediately when panel becomes visible
-    const user = window.currentUser || null;
+    const user = authStore.user || null;
     if (user && user.userId) {
+      // console.log('Fetching notifications for user:', user.userId);
       // Don't clear notifications here, just fetch new ones
-      notificationsStore.fetchNotifications(user.userId);
+      notificationsStore.fetchNotifications(user.userId).then(() => {
+        // console.log('Notifications refreshed when panel became visible');
+        // console.log('Current notifications:', notificationsStore.notifications);
+      });
       
       // Ensure we have an active subscription
       if (!unsubscribe.value) {
         unsubscribe.value = notificationsStore.subscribeToNotifications(user.userId);
       }
+    } else {
+      // console.warn('No user found when panel became visible');
     }
   } else {
     selectedNotification.value = null;
@@ -469,39 +656,27 @@ watch(notificationsCount, (newCount, oldCount) => {
 
 // Add this watch to refresh the UI when unread count changes
 watch(unreadCount, (newCount, oldCount) => {
-  console.log(`Unread count changed from ${oldCount} to ${newCount}`);
+  // console.log(`Unread count changed from ${oldCount} to ${newCount}`);
 });
+
+// Watch for auth store user changes
+watch(() => authStore.user, (newUser, oldUser) => {
+  if (newUser && newUser.userId && (!oldUser || oldUser.userId !== newUser.userId)) {
+    // console.log('User changed, fetching notifications for new user:', newUser.userId);
+    
+    // Clean up existing subscription
+    if (unsubscribe.value) {
+      unsubscribe.value();
+      unsubscribe.value = null;
+    }
+    
+    // Fetch notifications for new user
+    notificationsStore.fetchNotifications(newUser.userId).then(() => {
+      // console.log('Notifications fetched for new user');
+    });
+    
+    // Set up new subscription
+    unsubscribe.value = notificationsStore.subscribeToNotifications(newUser.userId);
+  }
+}, { immediate: true });
 </script>
-
-<style scoped>
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  transform: translateX(-20px);
-  opacity: 0;
-}
-
-/* Add slide-out animation */
-.v-leave-active {
-  transition: all 0.3s ease-in-out;
-}
-
-.v-leave-to {
-  opacity: 0;
-  transform: translateX(20px);
-}
-
-/* Add slide-in animation */
-.v-enter-active {
-  transition: all 0.3s ease-in-out;
-}
-
-.v-enter-from {
-  opacity: 0;
-  transform: translateX(20px);
-}
-</style>

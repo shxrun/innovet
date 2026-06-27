@@ -7,7 +7,6 @@ import '@/assets/styles/tailwind.css'
 
 // Import notification services
 import notificationService from './services/notificationService';
-import notificationSyncService from './services/notificationSyncService';
 
 // Import stores
 import { useNotificationsStore } from './stores/modules/notifications';
@@ -42,15 +41,12 @@ setTimeout(async () => {
   try {
     // Set the store in the services
     notificationService.setNotificationsStore(notificationsStore);
-    notificationSyncService.setNotificationsStore(notificationsStore);
     
     // Initialize services
     await notificationService.initialize();
-    await notificationSyncService.initialize();
     
-    console.log('Services initialized successfully');
   } catch (error) {
-    console.error('Error initializing services:', error);
+    // Error initializing services
   }
 }, 100);
 
@@ -60,8 +56,6 @@ if ('serviceWorker' in navigator) {
     scope: '/'
   })
     .then((registration) => {
-      console.log('Service Worker registered with scope:', registration.scope);
-      
       // Pass Firebase config to the service worker
       const firebaseConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -80,11 +74,9 @@ if ('serviceWorker' in navigator) {
           type: 'FIREBASE_CONFIG',
           config: firebaseConfig
         });
-        
-        console.log('Firebase config sent to service worker');
       }
     })
     .catch((error) => {
-      console.error('Service Worker registration failed:', error);
+      // Service Worker registration failed
     });
 }

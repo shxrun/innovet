@@ -2,20 +2,25 @@
 <template>
   <header data-header class="w-full bg-white rounded-2xl shadow-sm border border-gray-200">
     <div class="flex items-center justify-between h-16 px-6">
-      <!-- Sidebar toggle button for small screens -->
-      <button
-        v-if="isSmallScreen"
-        @click="$emit('toggle-sidebar')"
-        class="text-gray-500 hover:text-gray-700 transition-colors duration-200"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
-        </svg>
-      </button>
 
-      <!-- Spacer for larger screens -->
-      <div v-else class="w-6"></div>
+      <!-- LEFT SECTION: Sidebar toggle + Breadcrumb -->
+      <div class="flex items-center gap-4 overflow-x-auto">
+        <!-- Sidebar toggle button for small screens -->
+        <button
+          v-if="isSmallScreen"
+          @click="$emit('toggle-sidebar')"
+          class="text-gray-500 hover:text-gray-700 transition-colors duration-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+          </svg>
+        </button>
 
+        <!-- Breadcrumb component -->
+        <Breadcrumb :currentRoute="currentRoute" :navItems="navItems" class="hidden md:flex" />
+      </div>
+
+      <!-- RIGHT SECTION: Notifications, Calendar, Profile -->
       <div class="flex items-center gap-4 md:gap-6">
         <!-- Notifications Dropdown -->
         <div class="relative">
@@ -137,6 +142,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/modules/authStore';
 import { useProfileStore } from '@/stores/modules/profileStore';
+import Breadcrumb from '@/components/common/Breadcrumb.vue';
+
 
 import { 
   ChevronDownIcon,
@@ -159,7 +166,15 @@ const props = defineProps({
   isSmallScreen: {
     type: Boolean,
     required: true
-  }
+  },
+  currentRoute: {
+    type: String,
+    required: true
+  },
+  navItems: {
+    type: Array,
+    required: true
+  },
 });
 
 const emit = defineEmits(['toggle-sidebar']);
@@ -168,22 +183,41 @@ const isDropdownOpen = ref(false);
 const isNotificationsOpen = ref(false);
 
 const userPhotoURL = computed(() => {
-  return profileStore.profile?.photoURL || 'https://via.placeholder.com/40';
+  // Try profileStore first, then fallback to authStore, then default placeholder
+  const profilePhoto = profileStore.profile?.photoURL;
+  const authPhoto = authStore.user?.photoURL;
+  const defaultPhoto = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'36\' height=\'36\' viewBox=\'0 0 36 36\'%3E%3Crect width=\'36\' height=\'36\' fill=\'%23f0f2f5\'/%3E%3Cpath d=\'M18 20.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11ZM8 28.5c0-2.5 5-5 10-5s10 2.5 10 5\' stroke=\'%23bec3c9\' stroke-width=\'2\' fill=\'none\'/%3E%3C/svg%3E';
+  
+  console.log('Admin Header - Profile photo:', profilePhoto, 'Auth photo:', authPhoto);
+  return profilePhoto || authPhoto || defaultPhoto;
 });
 
 const totalNotificationsCount = ref(0);
 
 onMounted(async () => {
   if (authStore.user?.userId) {
-    await profileStore.fetchUserProfile(authStore.user.userId);
+    try {
+      await profileStore.fetchUserProfile(authStore.user.userId);
+    } catch (error) {
+      console.error('Error fetching profile in admin header:', error);
+    }
   }
 });
 
 watch(() => authStore.user, async (newUser) => {
   if (newUser?.userId) {
-    await profileStore.fetchUserProfile(newUser.userId);
+    try {
+      await profileStore.fetchUserProfile(newUser.userId);
+    } catch (error) {
+      console.error('Error fetching profile in admin header watch:', error);
+    }
   }
 }, { immediate: true });
+
+// Watch for profile changes to ensure header updates
+watch(() => profileStore.profile, (newProfile) => {
+  console.log('Profile updated in admin header:', newProfile?.photoURL);
+}, { deep: true });
 
 const toggleDropdown = () => {
   isDropdownOpen.value = !isDropdownOpen.value;

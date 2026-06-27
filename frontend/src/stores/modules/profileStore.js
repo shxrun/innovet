@@ -101,18 +101,38 @@ export const useProfileStore = defineStore('profile', {
       }
     },
     
-    async fetchUserProfile(userId) {
+    async fetchUserProfile(userId, forceRefresh = false) {
       this.loading = true;
       this.error = null;
       
       try {
         console.log('Fetching profile for userId:', userId);
+        
+        // If we already have this user's profile and it's not a force refresh, return it
+        if (!forceRefresh && this.profile && this.profile.uid && this.profile.uid === userId) {
+          console.log('Profile already loaded for user:', userId);
+          this.loading = false;
+          return this.profile;
+        }
+        
+        // Additional protection: if we have a different user's profile loaded, warn about it
+        if (this.profile && this.profile.uid && this.profile.uid !== userId) {
+          console.warn('Warning: fetchUserProfile called with different userId. Current profile is for:', this.profile.uid, 'but requested:', userId);
+          console.warn('This might overwrite the current user\'s profile. Consider using fetchOtherUserProfile instead.');
+        }
+        
         const userRef = doc(db, 'users', userId);
         const userDoc = await getDoc(userRef);
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          console.log('User profile data:', userData);
+          console.log('User profile data from Firestore:', {
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            role: userData.role,
+            photoURL: userData.photoURL
+          });
           
           // Handle photos based on their source
           if (userData.photoURL) {
@@ -129,7 +149,8 @@ export const useProfileStore = defineStore('profile', {
             }
           }
           
-          this.profile = userData;
+          // Add uid to track which user's profile this is
+          this.profile = { ...userData, uid: userId };
           this.calculateCompletionPercentage(userData);
           
           // Only refresh Google photos, not custom photos
@@ -254,6 +275,51 @@ export const useProfileStore = defineStore('profile', {
       });
       
       this.completionPercentage = Math.round((filledFields / requiredFields.length) * 100);
+    },
+    
+    // Method to clear profile data (useful when logging out or switching users)
+    clearProfile() {
+      this.profile = null;
+      this.completionPercentage = 0;
+      this.error = null;
+    },
+    
+    // Method to fetch another user's profile without overwriting current user's profile
+    async fetchOtherUserProfile(userId) {
+      try {
+        console.log('Fetching other user profile for userId:', userId);
+        const userRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          console.log('Other user profile data:', userData);
+          
+          // Handle photos based on their source
+          if (userData.photoURL) {
+            // If it's a Firebase Storage URL, use it directly
+            if (this.isFirebaseStorageURL(userData.photoURL)) {
+              console.log('Using Firebase Storage photo directly for other user:', userData.photoURL);
+              userData.originalPhotoURL = userData.photoURL;
+            }
+            // If it's a Google photo, create a proxy URL
+            else if (this.isGooglePhotoURL(userData.photoURL)) {
+              console.log('Using stored Google photo URL for other user:', userData.photoURL);
+              userData.originalPhotoURL = userData.photoURL;
+              userData.photoURL = this.getProxyPhotoURL(userData.photoURL);
+            }
+          }
+          
+          // Return the profile data without storing it in the store
+          return { ...userData, uid: userId };
+        } else {
+          console.error('No user document found for other user ID:', userId);
+          return null;
+        }
+      } catch (error) {
+        console.error('Error fetching other user profile:', error);
+        return null;
+      }
     }
   },
 

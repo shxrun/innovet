@@ -47,7 +47,7 @@
             >
               {{ step.label }}
             </span>
-          </div>
+          </div>  
         </div>
       </div>
     </div>
@@ -185,7 +185,6 @@
             
             <!-- Veterinarian list -->
             <div 
-              v-else
               v-for="doctor in veterinarians" 
               :key="doctor.userId || doctor.id" 
               class="flex flex-col p-3 md:p-4 border rounded-2xl cursor-pointer transition-all duration-200"
@@ -242,7 +241,7 @@
                 
                 <!-- Schedule display -->
                 <div class="text-xs text-gray-600 mb-2">
-                  {{ doctor.schedule || 'Mon-Fri, 9:00 AM to 5:00 PM' }}
+                  {{ doctor.schedule || 'Mon-Fri, 9:00 AM to 11:00 PM' }}
                 </div>
                 
                 <!-- Availability indicators -->
@@ -411,18 +410,273 @@
                 <button
                   v-for="timeSlot in availableTimeSlots"
                   :key="timeSlot.startTime"
-                  @click="selectTime(timeSlot.timeRange)"
+                  @click="timeSlot.isBooked ? null : selectTime(timeSlot.timeRange)"
                   :disabled="timeSlot.isBooked"
-                  class="p-2 md:p-3 rounded-lg text-center flex flex-col items-center"
+                  class="p-2 md:p-3 rounded-lg text-center flex flex-col items-center transition-all duration-200"
                   :class="[
-                    selectedTime === timeSlot.timeRange ? 'bg-blue-500 text-white' : 
-                    timeSlot.isBooked ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200',
+                    selectedTime === timeSlot.timeRange ? 'bg-blue-500 text-white shadow-lg' : 
+                    timeSlot.isBooked ? 'bg-red-100 text-red-600 cursor-not-allowed border border-red-200' : 'bg-gray-100 hover:bg-gray-200 hover:shadow-md',
                     'focus:outline-none focus:ring-2 focus:ring-blue-500'
                   ]"
                 >
                   <span class="text-xs md:text-sm font-medium">{{ timeSlot.timeRange }}</span>
-                  <span v-if="timeSlot.isBooked" class="text-[10px] md:text-xs mt-1 text-red-400">Booked</span>
+                  <span v-if="timeSlot.isBooked" class="text-[10px] md:text-xs mt-1 font-medium">Booked</span>
+                  <span v-else-if="selectedTime === timeSlot.timeRange" class="text-[10px] md:text-xs mt-1">Selected</span>
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Feedback and Follow-up Step -->
+          <div v-if="currentStep.id === 'feedback'" class="space-y-4 md:space-y-6">
+            <!-- Appointment Confirmation Summary -->
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div class="flex items-center mb-3">
+                <Check class="w-5 h-5 text-green-600 mr-2" />
+                <h3 class="text-lg font-semibold text-green-800">Appointment Confirmed!</h3>
+              </div>
+              <div class="text-sm text-green-700 space-y-1">
+                <p><strong>Date:</strong> {{ formatDate(selectedDate) }}</p>
+                <p><strong>Time:</strong> {{ selectedTime }}</p>
+                <p><strong>Doctor:</strong> {{ selectedDoctor ? `${getDoctorTitle(selectedDoctor)} ${selectedDoctor.firstName} ${selectedDoctor.lastName}` : '' }}</p>
+                <p><strong>Services:</strong> {{ selectedServices.map(id => getServiceName(id)).join(', ') }}</p>
+                <p v-if="selectedPets.length > 0"><strong>Pets:</strong> {{ selectedPets.map(pet => pet.name).join(', ') }}</p>
+              </div>
+            </div>
+
+            <!-- Feedback Section -->
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <MessageSquare class="w-5 h-5 text-blue-600 mr-2" />
+                Share Your Experience
+              </h3>
+              
+              <!-- Rating System -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">How would you rate your booking experience?</label>
+                <div class="flex items-center space-x-2">
+                  <button
+                    v-for="star in 5"
+                    :key="star"
+                    @click="setRating(star)"
+                    class="text-2xl transition-colors duration-200"
+                    :class="star <= feedbackRating ? 'text-yellow-400' : 'text-gray-300'"
+                  >
+                    ★
+                  </button>
+                  <span class="ml-3 text-sm text-gray-600">{{ feedbackRating }}/5</span>
+                </div>
+              </div>
+
+              <!-- Feedback Comments -->
+              <div class="mb-6">
+                <label for="feedbackComments" class="block text-sm font-medium text-gray-700 mb-2">
+                  Additional comments or suggestions (optional)
+                </label>
+                <textarea
+                  id="feedbackComments"
+                  v-model="feedbackComments"
+                  rows="4"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  placeholder="Tell us about your experience or any special requests..."
+                ></textarea>
+              </div>
+
+              <!-- Service Quality Questions -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">How would you rate the following aspects?</label>
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Ease of booking</span>
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-for="rating in 5"
+                        :key="rating"
+                        @click="setServiceRating('easeOfBooking', rating)"
+                        class="text-lg transition-colors duration-200"
+                        :class="rating <= serviceRatings.easeOfBooking ? 'text-blue-400' : 'text-gray-300'"
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Service variety</span>
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-for="rating in 5"
+                        :key="rating"
+                        @click="setServiceRating('serviceVariety', rating)"
+                        class="text-lg transition-colors duration-200"
+                        :class="rating <= serviceRatings.serviceVariety ? 'text-blue-400' : 'text-gray-300'"
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Website usability</span>
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-for="rating in 5"
+                        :key="rating"
+                        @click="setServiceRating('websiteUsability', rating)"
+                        class="text-lg transition-colors duration-200"
+                        :class="rating <= serviceRatings.websiteUsability ? 'text-blue-400' : 'text-gray-300'"
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Follow-up Options -->
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Calendar class="w-5 h-5 text-green-600 mr-2" />
+                Follow-up Options
+              </h3>
+              
+              <!-- Follow-up Preferences -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Would you like to schedule a follow-up appointment?</label>
+                <div class="space-y-3">
+                  <label class="flex items-center">
+                    <input
+                      type="radio"
+                      v-model="followUpPreference"
+                      value="yes"
+                      class="mr-3 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Yes, I'd like to schedule a follow-up</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="radio"
+                      v-model="followUpPreference"
+                      value="maybe"
+                      class="mr-3 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Maybe, I'll decide later</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="radio"
+                      v-model="followUpPreference"
+                      value="no"
+                      class="mr-3 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">No, this was a one-time visit</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Follow-up Date Selection (if yes) -->
+              <div v-if="followUpPreference === 'yes'" class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Preferred follow-up timeframe</label>
+                <select
+                  v-model="followUpTimeframe"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select timeframe</option>
+                  <option value="1-week">1 week</option>
+                  <option value="2-weeks">2 weeks</option>
+                  <option value="1-month">1 month</option>
+                  <option value="3-months">3 months</option>
+                  <option value="6-months">6 months</option>
+                  <option value="1-year">1 year</option>
+                  <option value="custom">Custom date</option>
+                </select>
+              </div>
+
+              <!-- Custom Follow-up Date (if custom selected) -->
+              <div v-if="followUpTimeframe === 'custom'" class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Custom follow-up date</label>
+                <input
+                  type="date"
+                  v-model="customFollowUpDate"
+                  :min="getMinFollowUpDate()"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <!-- Additional Services Interest -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Are you interested in any of these additional services?</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="vaccination"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Vaccination</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="dental"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Dental Care</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="grooming"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Grooming</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="nutrition"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Nutrition Consultation</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Communication Preferences -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">How would you prefer to be contacted about follow-ups?</label>
+                <div class="space-y-2">
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="communicationPreferences"
+                      value="email"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Email notifications</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="communicationPreferences"
+                      value="sms"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">SMS reminders</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="communicationPreferences"
+                      value="app"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">In-app notifications</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -660,7 +914,7 @@
                   <Clock class="w-5 h-5 text-gray-500 mr-2 mt-0.5" />
                   <div>
                     <p class="text-sm font-medium text-gray-700">Regular Hours</p>
-                    <p class="text-sm text-gray-600">{{ selectedDoctor.schedule || 'Mon-Fri, 9:00 AM to 5:00 PM' }}</p>
+                    <p class="text-sm text-gray-600">{{ selectedDoctor.schedule || 'Mon-Fri, 9:00 AM to 11:00 PM' }}</p>
                   </div>
                 </div>
                 
@@ -916,6 +1170,260 @@
               Please select a date and time to book your appointment
             </div>
           </div>
+
+          <!-- Feedback and Follow-up Step -->
+          <div v-if="currentStep.id === 'feedback'" class="space-y-4 md:space-y-6">
+            <!-- Appointment Confirmation Summary -->
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div class="flex items-center mb-3">
+                <Check class="w-5 h-5 text-green-600 mr-2" />
+                <h3 class="text-lg font-semibold text-green-800">Appointment Confirmed!</h3>
+              </div>
+              <div class="text-sm text-green-700 space-y-1">
+                <p><strong>Date:</strong> {{ formatDate(selectedDate) }}</p>
+                <p><strong>Time:</strong> {{ selectedTime }}</p>
+                <p><strong>Doctor:</strong> {{ selectedDoctor ? `${getDoctorTitle(selectedDoctor)} ${selectedDoctor.firstName} ${selectedDoctor.lastName}` : '' }}</p>
+                <p><strong>Services:</strong> {{ selectedServices.map(id => getServiceName(id)).join(', ') }}</p>
+                <p v-if="selectedPets.length > 0"><strong>Pets:</strong> {{ selectedPets.map(pet => pet.name).join(', ') }}</p>
+              </div>
+            </div>
+
+            <!-- Feedback Section -->
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <MessageSquare class="w-5 h-5 text-blue-600 mr-2" />
+                Share Your Experience
+              </h3>
+              
+              <!-- Rating System -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">How would you rate your booking experience?</label>
+                <div class="flex items-center space-x-2">
+                  <button
+                    v-for="star in 5"
+                    :key="star"
+                    @click="setRating(star)"
+                    class="text-2xl transition-colors duration-200"
+                    :class="star <= feedbackRating ? 'text-yellow-400' : 'text-gray-300'"
+                  >
+                    ★
+                  </button>
+                  <span class="ml-3 text-sm text-gray-600">{{ feedbackRating }}/5</span>
+                </div>
+              </div>
+
+              <!-- Feedback Comments -->
+              <div class="mb-6">
+                <label for="feedbackComments" class="block text-sm font-medium text-gray-700 mb-2">
+                  Additional comments or suggestions (optional)
+                </label>
+                <textarea
+                  id="feedbackComments"
+                  v-model="feedbackComments"
+                  rows="4"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  placeholder="Tell us about your experience or any special requests..."
+                ></textarea>
+              </div>
+
+              <!-- Service Quality Questions -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">How would you rate the following aspects?</label>
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Ease of booking</span>
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-for="rating in 5"
+                        :key="rating"
+                        @click="setServiceRating('easeOfBooking', rating)"
+                        class="text-lg transition-colors duration-200"
+                        :class="rating <= serviceRatings.easeOfBooking ? 'text-blue-400' : 'text-gray-300'"
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Service variety</span>
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-for="rating in 5"
+                        :key="rating"
+                        @click="setServiceRating('serviceVariety', rating)"
+                        class="text-lg transition-colors duration-200"
+                        :class="rating <= serviceRatings.serviceVariety ? 'text-blue-400' : 'text-gray-300'"
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Website usability</span>
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-for="rating in 5"
+                        :key="rating"
+                        @click="setServiceRating('websiteUsability', rating)"
+                        class="text-lg transition-colors duration-200"
+                        :class="rating <= serviceRatings.websiteUsability ? 'text-blue-400' : 'text-gray-300'"
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Follow-up Options -->
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Calendar class="w-5 h-5 text-green-600 mr-2" />
+                Follow-up Options
+              </h3>
+              
+              <!-- Follow-up Preferences -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Would you like to schedule a follow-up appointment?</label>
+                <div class="space-y-3">
+                  <label class="flex items-center">
+                    <input
+                      type="radio"
+                      v-model="followUpPreference"
+                      value="yes"
+                      class="mr-3 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Yes, I'd like to schedule a follow-up</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="radio"
+                      v-model="followUpPreference"
+                      value="maybe"
+                      class="mr-3 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Maybe, I'll decide later</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="radio"
+                      v-model="followUpPreference"
+                      value="no"
+                      class="mr-3 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">No, this was a one-time visit</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Follow-up Date Selection (if yes) -->
+              <div v-if="followUpPreference === 'yes'" class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Preferred follow-up timeframe</label>
+                <select
+                  v-model="followUpTimeframe"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select timeframe</option>
+                  <option value="1-week">1 week</option>
+                  <option value="2-weeks">2 weeks</option>
+                  <option value="1-month">1 month</option>
+                  <option value="3-months">3 months</option>
+                  <option value="6-months">6 months</option>
+                  <option value="1-year">1 year</option>
+                  <option value="custom">Custom date</option>
+                </select>
+              </div>
+
+              <!-- Custom Follow-up Date (if custom selected) -->
+              <div v-if="followUpTimeframe === 'custom'" class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Custom follow-up date</label>
+                <input
+                  type="date"
+                  v-model="customFollowUpDate"
+                  :min="getMinFollowUpDate()"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <!-- Additional Services Interest -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Are you interested in any of these additional services?</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="vaccination"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Vaccination</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="dental"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Dental Care</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="grooming"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Grooming</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="additionalServicesInterest"
+                      value="nutrition"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Nutrition Consultation</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Communication Preferences -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">How would you prefer to be contacted about follow-ups?</label>
+                <div class="space-y-2">
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="communicationPreferences"
+                      value="email"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Email notifications</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="communicationPreferences"
+                      value="sms"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">SMS reminders</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      v-model="communicationPreferences"
+                      value="app"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">In-app notifications</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       
         <!-- Navigation Buttons - For desktop and mobile second column -->
@@ -955,8 +1463,8 @@
   </div>
   
   <!-- Success Modal -->
-  <div v-if="showSuccessModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-xl p-6 md:p-8 max-w-md w-full mx-4 transform transition-all">
+  <div v-if="showSuccessModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeSuccessModal">
+    <div class="bg-white rounded-xl shadow-xl p-6 md:p-8 max-w-md w-full mx-4 transform transition-all" @click.stop>
       <div class="flex flex-col items-center text-center">
         <div class="w-12 h-12 md:w-16 md:h-16 bg-green-100 rounded-full flex items-center justify-center mb-3 md:mb-4">
           <Check class="w-6 h-6 md:w-8 md:h-8 text-green-600" />
@@ -1022,7 +1530,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeMount, onBeforeUnmount, nextTick } from "vue"
-import { useRouter } from "vue-router"
+import { useRouter, useRoute } from "vue-router"
 import {
   Stethoscope,
   User2,
@@ -1041,6 +1549,7 @@ import {
   MapPin,
   AlertTriangle,
   AlertCircle,
+  MessageSquare,
 } from "lucide-vue-next"
 import {
   startOfMonth,
@@ -1067,12 +1576,15 @@ import { useAuthStore } from "@/stores/modules/authStore"
 import { useProfileStore } from "@/stores/modules/profileStore"
 import { useOfficeStore } from "@/stores/modules/officeStore"
 import { useAppointmentStore } from "@/stores/modules/appointmentStore"
+import { useNotificationsStore } from "@/stores/modules/notifications"
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
 import dogImage from "@/assets/media/images/appointment/Dog.png"
 import catImage from "@/assets/media/images/appointment/Cat.png"
 import birdImage from "@/assets/media/images/appointment/Bird.png"
 import reptilesImage from "@/assets/media/images/appointment/Reptiles.png"
-import { getFirestore, collection, query, where, getDocs } from "firebase/firestore"
+import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import notificationService from "@/services/notificationService"
+import smsService from "@/services/smsService"
 
 // Define props to accept isSidebarOpen from parent component
 const props = defineProps({
@@ -1084,12 +1596,14 @@ const props = defineProps({
 
 const db = getFirestore()
 const router = useRouter()
+const route = useRoute()
 const categoryStore = useServiceCategoryStore()
 const petsStore = usePetsStore()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const officeStore = useOfficeStore()
 const appointmentStore = useAppointmentStore()
+const notificationsStore = useNotificationsStore()
 
 // Google Maps API Key
 const mapApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
@@ -1115,6 +1629,9 @@ const veterinarians = ref([])
 const mapContainer = ref(null)
 const mapError = ref(false)
 const map = ref(null)
+
+// Queue position state
+
 const marker = ref(null)
 const hasLocation = ref(false)
 const isMapInitialized = ref(false)
@@ -1760,6 +2277,12 @@ const steps = [
     icon: CalendarDays,
     description: "Pick a convenient date and time",
   },
+  {
+    id: "feedback",
+    label: "Feedback",
+    icon: MessageSquare,
+    description: "Share your experience and schedule follow-ups",
+  },
 ]
 
 // Update the petSpecies array with imported images
@@ -1782,6 +2305,20 @@ const selectedDoctor = ref(null)
 const selectedDate = ref(null)
 const selectedTime = ref(null)
 const currentDate = ref(new Date())
+
+// Feedback and follow-up data
+const feedbackRating = ref(0)
+const feedbackComments = ref("")
+const serviceRatings = ref({
+  easeOfBooking: 0,
+  serviceVariety: 0,
+  websiteUsability: 0
+})
+const followUpPreference = ref("")
+const followUpTimeframe = ref("")
+const customFollowUpDate = ref("")
+const additionalServicesInterest = ref([])
+const communicationPreferences = ref([])
 
 // Add these new refs for the connector line positioning
 const stepsContainer = ref(null)
@@ -2086,7 +2623,8 @@ const parseDoctorWorkingHours = (doctor, dayOfWeek) => {
   if (!doctor || !doctor.schedule) return null
   
   // Default office hours to use if we can't parse specific times
-  const defaultHours = { openTime: "09:00", closeTime: "17:00" }
+  // Updated to reflect actual vet availability: 9am to 11pm
+  const defaultHours = { openTime: "09:00", closeTime: "23:00" }
   
   try {
     const schedule = doctor.schedule
@@ -2238,28 +2776,69 @@ const availableTimeSlots = computed(() => {
       const isBooked = bookedAppointments.value.some((appointment) => {
         // Only consider appointments for the selected doctor
         if (selectedDoctor.value && appointment.doctorId !== (selectedDoctor.value.userId || selectedDoctor.value.id)) {
+          console.log(`Skipping appointment for different doctor: ${appointment.doctorId} vs ${selectedDoctor.value.userId || selectedDoctor.value.id}`)
           return false
         }
         
         // Check if the appointment status should block the time slot
         const blockingStatuses = ['approved', 'processing', 'completed']
         if (!blockingStatuses.includes(appointment.status)) {
+          console.log(`Skipping appointment with non-blocking status: ${appointment.status}`)
           return false // Don't block for pending, cancelled, or ended appointments
         }
         
-        // Extract just the start time from the appointment time range
-        const appointmentTimeString = appointment.time.split(" - ")[0].trim()
+        try {
+          // Extract just the start time from the appointment time range
+          const appointmentTimeString = appointment.time.split(" - ")[0].trim()
 
-        // Parse the appointment start time
-        const appointmentStartTime = parse(appointmentTimeString, "h:mm a", new Date(selectedDate.value))
+          // Parse the appointment start time with more robust parsing
+          let appointmentStartTime
+          try {
+            appointmentStartTime = parse(appointmentTimeString, "h:mm a", new Date(selectedDate.value))
+          } catch (parseError) {
+            // Try alternative parsing if the first one fails
+            console.log('Trying alternative time parsing for:', appointmentTimeString)
+            // Try parsing with different format
+            const timeMatch = appointmentTimeString.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
+            if (timeMatch) {
+              let hours = parseInt(timeMatch[1])
+              const minutes = parseInt(timeMatch[2])
+              const period = timeMatch[3].toUpperCase()
+              
+              // Convert to 24-hour format
+              if (period === 'PM' && hours !== 12) hours += 12
+              if (period === 'AM' && hours === 12) hours = 0
+              
+              appointmentStartTime = new Date(selectedDate.value)
+              appointmentStartTime.setHours(hours, minutes, 0, 0)
+            } else {
+              throw new Error('Unable to parse time format')
+            }
+          }
 
-        // Calculate the appointment end time based on its duration
-        const appointmentEndTime = new Date(appointmentStartTime)
-        appointmentEndTime.setMinutes(appointmentStartTime.getMinutes() + (appointment.duration || 60))
+          // Calculate the appointment end time based on its duration
+          const appointmentEndTime = new Date(appointmentStartTime)
+          appointmentEndTime.setMinutes(appointmentStartTime.getMinutes() + (appointment.duration || 60))
 
-        // Check for overlap:
-        // If slot starts before appointment ends AND slot ends after appointment starts
-        return slotStartTime < appointmentEndTime && slotEndTime > appointmentStartTime
+          // Check for overlap:
+          // If slot starts before appointment ends AND slot ends after appointment starts
+          const hasOverlap = slotStartTime < appointmentEndTime && slotEndTime > appointmentStartTime
+          
+          // Also check if the exact time range is already taken
+          const isExactMatch = appointment.time === slot.timeRange
+          
+          if (hasOverlap || isExactMatch) {
+            console.log(`Time slot ${slot.timeRange} conflicts with appointment ${appointment.time} (${appointment.status})`)
+            console.log(`Slot: ${slotStartTime.toLocaleTimeString()} - ${slotEndTime.toLocaleTimeString()}`)
+            console.log(`Appointment: ${appointmentStartTime.toLocaleTimeString()} - ${appointmentEndTime.toLocaleTimeString()}`)
+            console.log(`Exact match: ${isExactMatch}, Overlap: ${hasOverlap}`)
+          }
+          
+          return hasOverlap || isExactMatch
+        } catch (error) {
+          console.error('Error parsing appointment time:', appointment.time, error)
+          return false
+        }
       })
 
       return {
@@ -2311,6 +2890,17 @@ const fetchBookedAppointments = async () => {
     
     console.log(`Fetched ${bookedAppointments.value.length} booked appointments for ${dateString}`)
     console.log("Booked appointments:", bookedAppointments.value)
+    
+    // Debug: Log each appointment with its details
+    bookedAppointments.value.forEach((appointment, index) => {
+      console.log(`Appointment ${index + 1}:`, {
+        id: appointment.id,
+        time: appointment.time,
+        doctorId: appointment.doctorId,
+        duration: appointment.duration,
+        status: appointment.status
+      })
+    })
   } catch (error) {
     console.error("Error fetching booked appointments:", error)
   } finally {
@@ -2336,6 +2926,15 @@ watch(selectedServices, (newServices, oldServices) => {
     if (selectedDate.value) {
       fetchBookedAppointments()
     }
+  }
+})
+
+// Watch for success modal state to prevent/restore body scroll
+watch(showSuccessModal, (isOpen) => {
+  if (isOpen) {
+    preventBodyScroll()
+  } else {
+    restoreBodyScroll()
   }
 })
 
@@ -2418,19 +3017,29 @@ const currentMonthYear = computed(() => format(currentDate.value, "MMMM yyyy"))
 
 // Update canBook to handle both cases - regular services with pets and Veterinary Health Certificate
 const canBook = computed(() => {
+  // Check if the selected time slot is available (not booked)
+  const isTimeSlotAvailable = () => {
+    if (!selectedTime.value || !availableTimeSlots.value.length) return false
+    
+    const selectedSlot = availableTimeSlots.value.find(slot => slot.timeRange === selectedTime.value)
+    return selectedSlot && !selectedSlot.isBooked
+  }
+  
   if (isVeterinaryHealthCertificateCategory.value) {
     // For Veterinary Health Certificate, we don't need pet selection
     return selectedServices.value.length > 0 &&
            selectedDoctor.value &&
            selectedDate.value &&
-           selectedTime.value
+           selectedTime.value &&
+           isTimeSlotAvailable()
   } else {
     // For regular services, we need pet selection
     return selectedServices.value.length > 0 &&
            selectedPets.value.length > 0 &&
            selectedDoctor.value &&
            selectedDate.value &&
-           selectedTime.value
+           selectedTime.value &&
+           isTimeSlotAvailable()
   }
 })
 
@@ -2544,8 +3153,28 @@ const selectSpecies = (speciesId) => {
     }
   } else {
     selectedSpecies.value = speciesId
-    selectedPet.value = null
-    selectedPets.value = [] // Clear the pets array
+    
+    // Only clear pets if they don't match the selected species
+    if (selectedPets.value.length > 0) {
+      const preSelectedPet = selectedPets.value[0]
+      // Find the species name that matches the species ID
+      const selectedSpeciesName = petSpecies.find(species => species.id === speciesId)?.name
+      
+      if (preSelectedPet && preSelectedPet.species && selectedSpeciesName && 
+          preSelectedPet.species.toLowerCase() === selectedSpeciesName.toLowerCase()) {
+        // Keep the pre-selected pet if it matches the species
+        selectedPet.value = preSelectedPet
+        console.log('Keeping pre-selected pet that matches species:', preSelectedPet.name)
+      } else {
+        // Clear pets if they don't match the selected species
+        selectedPet.value = null
+        selectedPets.value = []
+        console.log('Clearing pets that don\'t match selected species')
+      }
+    } else {
+      selectedPet.value = null
+      selectedPets.value = []
+    }
   
     // Show second column on mobile after selection
     if (isMobile.value) {
@@ -2656,6 +3285,13 @@ const selectDate = (date) => {
 
 // Modified to handle time ranges
 const selectTime = (timeRange) => {
+  // Check if the time slot is booked
+  const selectedSlot = availableTimeSlots.value.find(slot => slot.timeRange === timeRange)
+  if (selectedSlot && selectedSlot.isBooked) {
+    console.log('Cannot select booked time slot:', timeRange)
+    return
+  }
+  
   // Toggle selection if clicking the same time
   if (selectedTime.value === timeRange) {
     selectedTime.value = null
@@ -2726,8 +3362,19 @@ const previousMonth = () => {
   currentDate.value = subMonths(currentDate.value, 1)
 }
 
+// Function to prevent body scroll when modal is open
+const preventBodyScroll = () => {
+  document.body.style.overflow = 'hidden'
+}
+
+// Function to restore body scroll when modal is closed
+const restoreBodyScroll = () => {
+  document.body.style.overflow = ''
+}
+
 const closeSuccessModal = () => {
   showSuccessModal.value = false
+  restoreBodyScroll()
   
   // Reset form after closing the modal
   selectedCategory.value = null
@@ -2791,6 +3438,11 @@ const bookAppointment = async () => {
       userId: authStore.user?.userId || "guest-user",
       status: "pending",
       isHealthCertificate: isVeterinaryHealthCertificateCategory.value, // Flag for health certificate
+      // Determine if this is a telehealth appointment based on selected services
+      isTelehealth: selectedServices.value.some(serviceId => {
+        const service = services.value.find(s => s.id === serviceId)
+        return service && service.isTelehealth === true
+      })
     }
   
     // Use the appointment store to add the appointment
@@ -2812,6 +3464,104 @@ const bookAppointment = async () => {
       duration: totalDurationMinutes.value,
     }
   
+    // Send notification to the user about the booking
+    try {
+      // Initialize notification service with the store
+      notificationService.setNotificationsStore(notificationsStore);
+      
+      const notificationTitle = "Appointment Booked Successfully!";
+      const notificationBody = isVeterinaryHealthCertificateCategory.value 
+        ? `Your Veterinary Health Certificate appointment on ${formatDate(selectedDate.value)} at ${selectedTime.value} has been booked. Please wait for veterinary approval.`
+        : `Your appointment for ${petNames.join(', ')} on ${formatDate(selectedDate.value)} at ${selectedTime.value} has been booked. Please wait for veterinary approval.`;
+      
+      // Send ONE notification to the user (this will handle both UI display and Firestore storage)
+      await notificationService.showNotification(notificationTitle, notificationBody, {
+        type: 'appointment',
+        url: '/user/notifications',
+        userId: authStore.user?.userId,
+        appointmentId: result,
+        status: 'pending',
+        fromClient: true,
+        storeInFirestore: true
+      });
+      
+      // Notify the veterinarian about the new booking
+      const vetUserId = selectedDoctor.value?.userId || selectedDoctor.value?.id
+      if (vetUserId) {
+        const vetTitle = 'New Appointment Request'
+        const vetBody = isVeterinaryHealthCertificateCategory.value
+          ? `A new Veterinary Health Certificate appointment was requested for ${formatDate(selectedDate.value)} at ${selectedTime.value}.`
+          : `A new appointment was requested for ${petNames.join(', ')} on ${formatDate(selectedDate.value)} at ${selectedTime.value}.`
+
+        // Send ONE notification to the vet
+        await notificationService.showNotification(vetTitle, vetBody, {
+          type: 'appointment',
+          url: '/vet/appointments/vetappointmentapproval',
+          userId: vetUserId,
+          appointmentId: String(result),
+          status: 'pending',
+          fromClient: true,
+          storeInFirestore: true
+        });
+      } else {
+        console.warn('No veterinarian userId found to send booking notification')
+      }
+      
+      console.log('Notifications sent for appointment booking');
+    } catch (notificationError) {
+      console.error('Error sending notifications:', notificationError);
+    }
+    
+    // Send SMS confirmation to user if phone is verified
+    try {
+      console.log('📱 Processing SMS confirmation for appointment creation...');
+      
+      // Get user's phone number and verification status
+      const userRef = doc(db, 'users', authStore.user?.userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const userPhone = userData.phone;
+        const isPhoneVerified = userData.phoneVerified;
+        
+        console.log('📱 User phone data for SMS:', { phone: userPhone, verified: isPhoneVerified });
+        
+        // Only send SMS if phone is verified and phone number exists
+        if (isPhoneVerified && userPhone && userPhone.trim() !== '') {
+          // Use the petNames from the outer scope (defined earlier in the function)
+          const appointmentDate = selectedDate.value;
+          const appointmentTime = selectedTime.value;
+          const isHealthCertificate = isVeterinaryHealthCertificateCategory.value;
+          
+          console.log('📱 Sending SMS confirmation to:', userPhone);
+          console.log('📱 SMS data:', { petNames, appointmentDate, appointmentTime, isHealthCertificate });
+          
+          // Send SMS confirmation
+          const smsResult = await smsService.sendAppointmentConfirmation(
+            userPhone, 
+            petNames, 
+            appointmentDate, 
+            appointmentTime, 
+            isHealthCertificate
+          );
+          
+          if (smsResult.success) {
+            console.log('📱 SMS confirmation sent successfully:', smsResult.messageId);
+          } else {
+            console.log('❌ SMS confirmation failed:', smsResult.error);
+          }
+        } else {
+          console.log('⚠️ Skipping SMS confirmation: phone not verified or no phone number');
+        }
+      } else {
+        console.log('⚠️ User document not found for SMS confirmation');
+      }
+    } catch (smsError) {
+      console.error('❌ Error processing SMS confirmation:', smsError);
+      // Don't break the appointment creation flow if SMS fails
+    }
+    
     // Show success modal
     showSuccessModal.value = true
   } catch (error) {
@@ -2844,6 +3594,31 @@ const initializeAuthAndFetchData = async () => {
     if (authStore.user && authStore.user.userId) {
       try {
         userPets.value = (await petsStore.fetchUserPets(authStore.user.userId)) || []
+        
+        // Pre-select pet if petId is provided in route query
+        if (route.query.petId && userPets.value.length > 0) {
+          const petToSelect = userPets.value.find(pet => pet.id === route.query.petId)
+          if (petToSelect) {
+            // Find the species ID that matches the pet's species name
+            const matchingSpecies = petSpecies.find(species => 
+              species.name.toLowerCase() === petToSelect.species.toLowerCase()
+            )
+            
+            if (matchingSpecies) {
+              // Set the species ID (required for pet selection)
+              selectedSpecies.value = matchingSpecies.id
+              // Pre-select the pet
+              selectedPets.value = [petToSelect]
+              selectedPet.value = petToSelect
+              console.log('Pre-selected pet from Dashboard:', petToSelect.name, 'Species ID:', matchingSpecies.id, 'Species Name:', petToSelect.species)
+            } else {
+              console.warn('No matching species found for pet species:', petToSelect.species)
+            }
+            
+            // Force reactivity update to ensure UI reflects the species selection
+            await nextTick()
+          }
+        }
       } catch (error) {
         console.error("Error fetching user pets:", error)
         userPets.value = []
@@ -2872,23 +3647,70 @@ const isDoctorAvailableToday = (doctor) => {
   // Get the current day of the week (0 = Sunday, 1 = Monday, etc.)
   const today = new Date().getDay()
   
+  console.log(`🔍 Checking availability for doctor: ${doctor.firstName} ${doctor.lastName}`)
+  console.log(`📅 Today is day index: ${today} (${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today]})`)
+  console.log(`📋 Doctor schedule: "${doctor.schedule}"`)
+  
   // Check if the doctor is available on this day
-  return isDoctorAvailableOnDay(doctor, today)
+  const isAvailable = isDoctorAvailableOnDay(doctor, today)
+  console.log(`✅ Doctor available today: ${isAvailable}`)
+  
+  return isAvailable
 }
 
 // Function to check if a doctor is available on a specific day
 const isDoctorAvailableOnDay = (doctor, dayIndex) => {
-  if (!doctor || !doctor.schedule) return false
+  if (!doctor || !doctor.schedule) {
+    console.log(`❌ No doctor or schedule found`)
+    return false
+  }
   
   // Default schedule is Monday to Friday
   const defaultAvailableDays = [1, 2, 3, 4, 5] // Monday to Friday
   
   // Check if the schedule contains specific days
   const schedule = doctor.schedule.toLowerCase()
+  console.log(`🔍 Checking schedule: "${schedule}" for day index: ${dayIndex}`)
+  
+  // Check for "all week" or "every day" patterns first
+  if (schedule.includes("all week") || 
+      schedule.includes("every day") || 
+      schedule.includes("daily") || 
+      schedule.includes("7 days") || 
+      schedule.includes("seven days") ||
+      schedule.includes("all days") ||
+      schedule.includes("full week")) {
+    console.log(`✅ Pattern matched: "all week" type`)
+    return true // Available every day
+  }
+  
+  // Check for "Mon-Sun" or similar full week patterns
+  if (schedule.includes("mon-sun") || 
+      schedule.includes("monday to sunday") || 
+      schedule.includes("monday-sunday") ||
+      schedule.includes("mon to sun") ||
+      schedule.includes("monday through sunday")) {
+    console.log(`✅ Pattern matched: "Mon-Sun" type`)
+    return true // Available every day (Monday through Sunday)
+  }
   
   // Check for common day patterns
-  if (schedule.includes("mon-fri") || schedule.includes("monday to friday") || schedule.includes("monday-friday")) {
+  if (schedule.includes("mon-fri") || 
+      schedule.includes("monday to friday") || 
+      schedule.includes("monday-friday") ||
+      schedule.includes("weekdays") ||
+      schedule.includes("week days")) {
+    console.log(`✅ Pattern matched: "Mon-Fri" type`)
     return defaultAvailableDays.includes(dayIndex)
+  }
+  
+  // Check for weekend patterns
+  if (schedule.includes("weekend") || 
+      schedule.includes("week ends") ||
+      schedule.includes("sat-sun") ||
+      schedule.includes("saturday to sunday")) {
+    console.log(`✅ Pattern matched: "weekend" type`)
+    return dayIndex === 0 || dayIndex === 6 // Sunday or Saturday
   }
   
   // Check for specific days
@@ -2903,10 +3725,18 @@ const isDoctorAvailableOnDay = (doctor, dayIndex) => {
   ]
   
   // Check if the day is mentioned in the schedule
-  return days.some(day => 
+  const dayMatch = days.some(day => 
     (day.index === dayIndex) && 
     (schedule.includes(day.name) || schedule.includes(day.abbr))
   )
+  
+  if (dayMatch) {
+    console.log(`✅ Pattern matched: specific day`)
+  } else {
+    console.log(`❌ No pattern matched for day index ${dayIndex}`)
+  }
+  
+  return dayMatch
 }
 
 // Function to get the next available day for a doctor
@@ -2948,7 +3778,7 @@ const isExpanded = ref(false)
 // Format office hours for display
 const formatOfficeHours = computed(() => {
   if (!officeStore || !officeStore.getOfficeHours) {
-    return { openTime: "9:00 AM", closeTime: "5:00 PM" }
+    return { openTime: "9:00 AM", closeTime: "11:00 PM" }
   }
   
   // Get the day of week for the selected date or today
@@ -3000,6 +3830,49 @@ const isCurrentDayScheduleClosed = computed(() => {
   return false
 })
 
+// Feedback and follow-up methods
+const setRating = (rating) => {
+  feedbackRating.value = rating
+}
+
+const setServiceRating = (aspect, rating) => {
+  serviceRatings.value[aspect] = rating
+}
+
+const getMinFollowUpDate = () => {
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return tomorrow.toISOString().split('T')[0]
+}
+
+const submitFeedback = async () => {
+  try {
+    // Here you would typically send the feedback to your backend
+    console.log('Feedback submitted:', {
+      rating: feedbackRating.value,
+      comments: feedbackComments.value,
+      serviceRatings: serviceRatings.value,
+      followUpPreference: followUpPreference.value,
+      followUpTimeframe: followUpTimeframe.value,
+      customFollowUpDate: customFollowUpDate.value,
+      additionalServicesInterest: additionalServicesInterest.value,
+      communicationPreferences: communicationPreferences.value
+    })
+    
+    // Show success message or proceed to next step
+    // You can implement your own logic here
+  } catch (error) {
+    console.error('Error submitting feedback:', error)
+  }
+}
+
+
+
+
+
+
+
 // Initialize data on component mount
 onMounted(async () => {
   try {
@@ -3022,11 +3895,16 @@ onMounted(async () => {
     // Fetch veterinarians
     await fetchVeterinarians()
     
+    // Notification service is initialized when needed during appointment booking
+    
     // Position the connector line
     positionConnectorLine()
     
     // Add window resize event listener for connector line
     window.addEventListener("resize", positionConnectorLine)
+    
+    // Don't automatically show second column on mobile during initialization
+    // Let the user navigate through the steps naturally
     
     console.log("Initialization complete")
   } catch (error) {
@@ -3039,6 +3917,8 @@ onMounted(async () => {
 // Clean up event listeners
 onBeforeUnmount(() => {
   window.removeEventListener("resize", positionConnectorLine)
+  // Restore body scroll in case modal was open when component unmounts
+  restoreBodyScroll()
 })
 
 // Use authStore.isInitialized directly in the conditional check
@@ -3054,6 +3934,56 @@ watch(shouldInitializeAuth, async (newVal) => {
     }
   }
 }, { immediate: true });
+
+// Watch for route changes to handle petId parameter
+watch(() => route.query.petId, async (newPetId) => {
+  if (newPetId && userPets.value.length > 0) {
+    const petToSelect = userPets.value.find(pet => pet.id === newPetId)
+    if (petToSelect) {
+      // Find the species ID that matches the pet's species name
+      const matchingSpecies = petSpecies.find(species => 
+        species.name.toLowerCase() === petToSelect.species.toLowerCase()
+      )
+      
+      if (matchingSpecies) {
+        // Set the species ID (required for pet selection)
+        selectedSpecies.value = matchingSpecies.id
+        // Pre-select the pet
+        selectedPets.value = [petToSelect]
+        selectedPet.value = petToSelect
+        console.log('Pre-selected pet from route change:', petToSelect.name, 'Species ID:', matchingSpecies.id, 'Species Name:', petToSelect.species)
+      } else {
+        console.warn('No matching species found for pet species:', petToSelect.species)
+      }
+      
+      // Force reactivity update to ensure UI reflects the species selection
+      await nextTick()
+    }
+  }
+});
+
+// Watch for mobile state changes to handle pre-selected pets
+watch(isMobile, (newIsMobile) => {
+  // Only show second column if we're on mobile, have a pre-selected pet, AND we're on the pet selection step
+  if (newIsMobile && selectedPets.value.length > 0 && currentStepIndex.value === 1) {
+    showSecondColumn.value = true
+  }
+});
+
+// Watch for current step changes to handle pre-selected pets on mobile
+watch(currentStepIndex, (newStepIndex) => {
+  if (isMobile.value) {
+    if (newStepIndex === 1 && selectedPets.value.length > 0) {
+      // When user reaches the pet selection step (index 1) and has pre-selected pets, show second column
+      showSecondColumn.value = true
+      console.log('Showing second column for pre-selected pet on mobile')
+    } else if (newStepIndex === 0) {
+      // When user goes back to service selection step (index 0), hide second column to show services
+      showSecondColumn.value = false
+      console.log('Hiding second column to show services on mobile')
+    }
+  }
+});
 </script>
 
 <style>

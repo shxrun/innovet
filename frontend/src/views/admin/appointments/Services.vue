@@ -174,6 +174,11 @@
                       <div class="text-sm text-gray-900">{{ category.description }}</div>
                     </td>
                     <td class="py-4 px-6">
+                      <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="formatTelehealthStatus(category.isTelehealth).class">
+                        {{ formatTelehealthStatus(category.isTelehealth).text }}
+                      </div>
+                    </td>
+                    <td class="py-4 px-6">
                       <div class="text-sm text-gray-900">{{ getServiceCountForCategory(category.id) }}</div>
                     </td>
                     <td class="py-4 px-6 text-sm text-gray-600">
@@ -201,7 +206,7 @@
                   </tr>
                   <!-- Empty state for categories -->
                   <tr v-if="paginatedItems.length === 0">
-                    <td colspan="6" class="py-8 text-center text-gray-500">
+                    <td colspan="7" class="py-8 text-center text-gray-500">
                       <div class="flex flex-col items-center justify-center">
                         <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                           <ListIcon class="w-8 h-8 text-gray-300" />
@@ -240,6 +245,16 @@
                     <td class="py-4 px-6">
                       <div class="text-sm text-gray-900">{{ service.fees || 'None' }}</div>
                     </td>
+                    <td class="py-4 px-6">
+                      <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="formatTelehealthStatus(service.isTelehealth).class">
+                        {{ formatTelehealthStatus(service.isTelehealth).text }}
+                      </div>
+                    </td>
+                    <td class="py-4 px-6">
+                      <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="formatVaccinationStatus(service.isVaccination).class">
+                        {{ formatVaccinationStatus(service.isVaccination).text }}
+                      </div>
+                    </td>
                     <td class="py-4 px-6 text-sm text-gray-600">
                       {{ formatTimestamp(service.createdAt) }}
                     </td>
@@ -265,7 +280,7 @@
                   </tr>
                   <!-- Empty state for services -->
                   <tr v-if="paginatedItems.length === 0">
-                    <td colspan="9" class="py-8 text-center text-gray-500">
+                    <td colspan="11" class="py-8 text-center text-gray-500">
                       <div class="flex flex-col items-center justify-center">
                         <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                           <PackageIcon class="w-8 h-8 text-gray-300" />
@@ -319,6 +334,30 @@
               <div>
                 <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea id="description" v-model="categoryForm.description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200"></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Telehealth Option</label>
+                <div class="flex items-center space-x-4">
+                  <label class="flex items-center">
+                    <input 
+                      type="radio" 
+                      v-model="categoryForm.isTelehealth" 
+                      :value="true" 
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">Telehealth Available</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input 
+                      type="radio" 
+                      v-model="categoryForm.isTelehealth" 
+                      :value="false" 
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm text-gray-700">In-Person Only</span>
+                  </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Select whether this category supports telehealth appointments</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Cover Photo</label>
@@ -473,6 +512,213 @@
                     </div>
                   </div>
                 </div>
+                <div class="col-span-1 sm:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Telehealth Option</label>
+                  <div class="flex items-center space-x-4">
+                    <label class="flex items-center">
+                      <input 
+                        type="radio" 
+                        v-model="serviceForm.isTelehealth" 
+                        :value="true" 
+                        class="mr-2 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span class="text-sm text-gray-700">Telehealth Available</span>
+                    </label>
+                    <label class="flex items-center">
+                      <input 
+                        type="radio" 
+                        v-model="serviceForm.isTelehealth" 
+                        :value="false" 
+                        class="mr-2 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span class="text-sm text-gray-700">In-Person Only</span>
+                    </label>
+                  </div>
+                  <p class="mt-1 text-xs text-gray-500">Select whether this service supports telehealth appointments</p>
+                </div>
+                
+                <!-- NEW: Vaccination Service Type Field -->
+                <div class="col-span-1 sm:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+                  <div class="flex items-center space-x-4">
+                    <label class="flex items-center">
+                      <input 
+                        type="radio" 
+                        v-model="serviceForm.isVaccination" 
+                        :value="true" 
+                        class="mr-2 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span class="text-sm text-gray-700">Vaccination Service</span>
+                    </label>
+                    <label class="flex items-center">
+                      <input 
+                        type="radio" 
+                        v-model="serviceForm.isVaccination" 
+                        :value="false" 
+                        class="mr-2 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span class="text-sm text-gray-700">Regular Service</span>
+                    </label>
+                  </div>
+                  <p class="mt-1 text-xs text-gray-500">Mark this service as a vaccination for proper tracking and history</p>
+                </div>
+
+                <!-- Vaccination-Specific Fields (shown only when isVaccination is true) -->
+                <div v-if="serviceForm.isVaccination" class="col-span-1 sm:col-span-2">
+                  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-blue-900 mb-3">Vaccination Settings</h3>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <!-- Vaccine Type -->
+                      <div>
+                        <label for="vaccineType" class="block text-sm font-medium text-gray-700 mb-1">Vaccine Type</label>
+                        <input 
+                          type="text" 
+                          id="vaccineType" 
+                          v-model="serviceForm.vaccineType" 
+                          placeholder="e.g., Rabies, DHPP, Bordetella"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200" 
+                        />
+                      </div>
+
+                      <!-- Series Type -->
+                      <div>
+                        <label for="seriesType" class="block text-sm font-medium text-gray-700 mb-1">Series Type</label>
+                        <select 
+                          id="seriesType" 
+                          v-model="serviceForm.seriesType" 
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200"
+                        >
+                          <option value="single">Single Dose</option>
+                          <option value="series">Multi-Dose Series</option>
+                          <option value="both">Both (Single + Series)</option>
+                        </select>
+                      </div>
+
+                      <!-- Minimum Age (Weeks) -->
+                      <div>
+                        <label for="minAgeWeeks" class="block text-sm font-medium text-gray-700 mb-1">Minimum Age (Weeks)</label>
+                        <input 
+                          type="number" 
+                          id="minAgeWeeks" 
+                          v-model.number="serviceForm.minAgeWeeks" 
+                          min="0"
+                          placeholder="6"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200" 
+                        />
+                      </div>
+
+                      <!-- Total Boosters -->
+                      <div>
+                        <label for="totalBoosters" class="block text-sm font-medium text-gray-700 mb-1">Total Boosters</label>
+                        <input 
+                          type="number" 
+                          id="totalBoosters" 
+                          v-model.number="serviceForm.totalBoosters" 
+                          min="0"
+                          placeholder="1"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200" 
+                        />
+                      </div>
+
+                      <!-- Next Dose Interval -->
+                      <div>
+                        <label for="nextDoseIn" class="block text-sm font-medium text-gray-700 mb-1">Next Dose Interval</label>
+                        <div class="flex gap-2">
+                          <input 
+                            type="number" 
+                            id="nextDoseIn" 
+                            v-model.number="serviceForm.nextDoseIn" 
+                            min="1"
+                            placeholder="14"
+                            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200" 
+                          />
+                          <select 
+                            v-model="serviceForm.nextDoseUnit" 
+                            class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200"
+                          >
+                            <option value="days">Days</option>
+                            <option value="weeks">Weeks</option>
+                            <option value="months">Months</option>
+                            <option value="years">Years</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <!-- Reminder Days -->
+                      <div>
+                        <label for="reminderDays" class="block text-sm font-medium text-gray-700 mb-1">Reminder Days Before Due</label>
+                        <input 
+                          type="number" 
+                          id="reminderDays" 
+                          v-model.number="serviceForm.reminderDays" 
+                          min="0"
+                          placeholder="30"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200" 
+                        />
+                      </div>
+
+                      <!-- Auto Schedule -->
+                      <div class="col-span-1 sm:col-span-2">
+                        <label class="flex items-center">
+                          <input 
+                            type="checkbox" 
+                            v-model="serviceForm.autoSchedule" 
+                            class="mr-2 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span class="text-sm font-medium text-gray-700">Auto-Schedule Next Vaccination</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500">Automatically create follow-up vaccination appointments when this service is completed</p>
+                      </div>
+
+                      <!-- Booster Schedule -->
+                      <div class="col-span-1 sm:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Booster Schedule</label>
+                        <div class="space-y-2">
+                          <div v-for="(booster, index) in serviceForm.boosterSchedule" :key="index" class="flex gap-2">
+                            <input 
+                              type="number" 
+                              v-model.number="booster.interval" 
+                              placeholder="Interval"
+                              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200" 
+                            />
+                            <select 
+                              v-model="booster.unit" 
+                              class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200"
+                            >
+                              <option value="days">Days</option>
+                              <option value="weeks">Weeks</option>
+                              <option value="months">Months</option>
+                              <option value="years">Years</option>
+                            </select>
+                            <input 
+                              type="text" 
+                              v-model="booster.description" 
+                              placeholder="Description (e.g., 2nd dose, booster)"
+                              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200" 
+                            />
+                            <button 
+                              @click="removeBooster(index)" 
+                              type="button" 
+                              class="px-2 py-2 text-red-600 hover:text-red-800"
+                            >
+                              <XIcon class="w-4 h-4" />
+                            </button>
+                          </div>
+                          <button 
+                            @click="addBooster" 
+                            type="button" 
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                          >
+                            <PlusIcon class="w-4 h-4 mr-2" />
+                            Add Booster Schedule
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 <div class="col-span-1 sm:col-span-2">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Requirements</label>
                   <div v-for="(req, index) in serviceForm.requirements" :key="index" class="flex mt-2">
@@ -648,6 +894,7 @@ const archivesStore = useArchivesStore();
 const categoryForm = ref({
   name: '',
   description: '',
+  isTelehealth: false,
   coverPhoto: null,
   file: null
 });
@@ -660,6 +907,18 @@ const serviceForm = ref({
   processingTime: '',
   fees: '',
   description: '',
+  isTelehealth: false,
+  isVaccination: false,
+  // Vaccination-specific fields
+  vaccineType: '',
+  seriesType: 'single',
+  minAgeWeeks: 6,
+  totalBoosters: 1,
+  nextDoseIn: 14,
+  nextDoseUnit: 'days',
+  reminderDays: 30,
+  autoSchedule: true,
+  boosterSchedule: [],
   requirements: [''],
   coverPhoto: null,
   file: null
@@ -669,12 +928,13 @@ const serviceForm = ref({
 const categoryHeaders = [
   { key: 'name', label: 'Category Name' },
   { key: 'description', label: 'Description' },
+  { key: 'isTelehealth', label: 'Telehealth' },
   { key: 'serviceCount', label: 'Services' },
   { key: 'createdAt', label: 'Created' },
   { key: 'updatedAt', label: 'Updated' }
 ];
 
-// Updated service headers to include the Category column
+// Updated service headers to include the Category column and Vaccination type
 const serviceHeaders = [
   { key: 'name', label: 'Service Name' },
   { key: 'categoryId', label: 'Category' },
@@ -682,6 +942,8 @@ const serviceHeaders = [
   { key: 'transactionType', label: 'Transaction Type' },
   { key: 'processingTime', label: 'Service Duration' },
   { key: 'fees', label: 'Fees' },
+  { key: 'isTelehealth', label: 'Telehealth' },
+  { key: 'isVaccination', label: 'Vaccination' },
   { key: 'createdAt', label: 'Created' },
   { key: 'updatedAt', label: 'Updated' }
 ];
@@ -712,6 +974,36 @@ const getServiceCountForCategory = (categoryId) => {
 const getCategoryName = (categoryId) => {
   const category = categories.value.find(cat => cat.id === categoryId);
   return category ? category.name : 'Unknown';
+};
+
+// Function to format telehealth status for display
+const formatTelehealthStatus = (isTelehealth) => {
+  if (isTelehealth === true || isTelehealth === 'true') {
+    return {
+      text: 'Available',
+      class: 'bg-green-100 text-green-800'
+    };
+  } else {
+    return {
+      text: 'In-Person Only',
+      class: 'bg-gray-100 text-gray-800'
+    };
+  }
+};
+
+// Function to format vaccination status for display
+const formatVaccinationStatus = (isVaccination) => {
+  if (isVaccination === true || isVaccination === 'true') {
+    return {
+      text: 'Vaccination',
+      class: 'bg-purple-100 text-purple-800'
+    };
+  } else {
+    return {
+      text: 'Regular',
+      class: 'bg-gray-100 text-gray-800'
+    };
+  }
 };
 
 const items = computed(() => activeTab.value === 'categories' ? categories.value : services.value);
@@ -972,6 +1264,7 @@ const addNew = () => {
     categoryForm.value = { 
       name: '', 
       description: '',
+      isTelehealth: false,
       coverPhoto: null,
       file: null
     };
@@ -985,6 +1278,18 @@ const addNew = () => {
       processingTime: '',
       fees: '',
       description: '',
+      isTelehealth: false,
+      isVaccination: false,
+      // Vaccination-specific fields
+      vaccineType: '',
+      seriesType: 'single',
+      minAgeWeeks: 6,
+      totalBoosters: 1,
+      nextDoseIn: 14,
+      nextDoseUnit: 'days',
+      reminderDays: 30,
+      autoSchedule: true,
+      boosterSchedule: [],
       requirements: [''],
       coverPhoto: null,
       file: null
@@ -1052,6 +1357,7 @@ const editItem = (item) => {
     categoryForm.value = { 
       name: item.name,
       description: item.description,
+      isTelehealth: item.isTelehealth || false,
       coverPhoto: item.coverPhoto,
       file: null
     };
@@ -1059,6 +1365,18 @@ const editItem = (item) => {
   } else {
     serviceForm.value = { 
       ...item,
+      isTelehealth: item.isTelehealth || false,
+      isVaccination: item.isVaccination || false,
+      // Ensure vaccination fields are properly initialized
+      vaccineType: item.vaccineType || '',
+      seriesType: item.seriesType || 'single',
+      minAgeWeeks: item.minAgeWeeks || 6,
+      totalBoosters: item.totalBoosters || 1,
+      nextDoseIn: item.nextDoseIn || 14,
+      nextDoseUnit: item.nextDoseUnit || 'days',
+      reminderDays: item.reminderDays || 30,
+      autoSchedule: item.autoSchedule !== undefined ? item.autoSchedule : true,
+      boosterSchedule: item.boosterSchedule || [],
       file: null
     };
     
@@ -1181,6 +1499,19 @@ const removeRequirement = (index) => {
   serviceForm.value.requirements.splice(index, 1);
 };
 
+// Booster schedule management functions
+const addBooster = () => {
+  serviceForm.value.boosterSchedule.push({
+    interval: 1,
+    unit: 'months',
+    description: ''
+  });
+};
+
+const removeBooster = (index) => {
+  serviceForm.value.boosterSchedule.splice(index, 1);
+};
+
 const prevPage = () => {
   if (currentPage.value > 1) {
     currentPage.value--;
@@ -1207,7 +1538,7 @@ const exportToCSV = () => {
   const items = activeTab.value === 'categories' ? categories.value : services.value;
   const headers = activeTab.value === 'categories' 
     ? ['Category Name', 'Description', 'Services Count', 'Time Added', 'Time Updated']
-    : ['Service Name', 'Category', 'Classification', 'Transaction Type', 'Service Duration', 'Fees', 'Description', 'Requirements', 'Time Added', 'Time Updated'];
+    : ['Service Name', 'Category', 'Classification', 'Transaction Type', 'Service Duration', 'Fees', 'Description', 'Requirements', 'Telehealth', 'Vaccination', 'Time Added', 'Time Updated'];
   
   const csvContent = [
     headers.join(','),
@@ -1230,6 +1561,8 @@ const exportToCSV = () => {
           item.fees,
           item.description,
           item.requirements.join('; '),
+          item.isTelehealth ? 'Yes' : 'No',
+          item.isVaccination ? 'Yes' : 'No',
           formatTimestamp(item.createdAt),
           formatTimestamp(item.updatedAt)
         ].map(field => `"${field || ''}"`).join(',');

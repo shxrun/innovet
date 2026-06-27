@@ -22,7 +22,10 @@ export const usePetsStore = defineStore('pets', {
     loading: false,
     error: null,
     selectedPet: null,
-    archivesStore: useArchivesStore() // Initialize archivesStore here
+    archivesStore: useArchivesStore(), // Initialize archivesStore here
+    lastFetchTime: null,
+    cacheExpiry: 5 * 60 * 1000, // 5 minutes cache expiry
+    currentUserId: null
   }),
 
   actions: {
@@ -34,6 +37,22 @@ export const usePetsStore = defineStore('pets', {
       // if (!this.archivesStore) {
       //   this.archivesStore = useArchivesStore();
       // }
+    },
+
+    /**
+     * Check if cached data is still valid
+     * @param {string} userId - The user ID to check cache for
+     * @returns {boolean} - True if cache is valid, false otherwise
+     */
+    isDataCached(userId) {
+      if (!this.lastFetchTime || this.currentUserId !== userId) {
+        return false;
+      }
+      
+      const now = Date.now();
+      const timeSinceLastFetch = now - this.lastFetchTime;
+      
+      return timeSinceLastFetch < this.cacheExpiry;
     },
 
     /**
@@ -51,11 +70,18 @@ export const usePetsStore = defineStore('pets', {
     },
 
     /**
-     * Fetch all pets for a specific user
+     * Fetch all pets for a specific user with caching
      * @param {string} userId - The ID of the user
+     * @param {boolean} forceRefresh - Force refresh even if cache is valid
      * @returns {Array} - Array of pet objects
      */
-    async fetchUserPets(userId) {
+    async fetchUserPets(userId, forceRefresh = false) {
+      // Check if we have valid cached data
+      if (!forceRefresh && this.isDataCached(userId)) {
+        console.log('Using cached pets data for userId:', userId);
+        return this.pets;
+      }
+
       this.loading = true;
       this.error = null;
       
@@ -74,10 +100,14 @@ export const usePetsStore = defineStore('pets', {
           
           console.log('Fetched pets data:', petsData);
           this.pets = petsData;
+          this.lastFetchTime = Date.now();
+          this.currentUserId = userId;
           return petsData;
         } else {
           console.log('No pets found for user:', userId);
           this.pets = [];
+          this.lastFetchTime = Date.now();
+          this.currentUserId = userId;
           return [];
         }
       } catch (error) {
@@ -136,6 +166,8 @@ export const usePetsStore = defineStore('pets', {
         };
         
         this.pets.push(newPet);
+        // Invalidate cache since we added new data
+        this.lastFetchTime = null;
         return newPet;
       } catch (error) {
         console.error('Error adding pet:', error);
@@ -270,6 +302,8 @@ export const usePetsStore = defineStore('pets', {
           
           // Update local state
           this.pets = this.pets.filter(p => p.id !== petId);
+          // Invalidate cache since we deleted data
+          this.lastFetchTime = null;
           
           console.log('Pet archived and deleted successfully:', petId);
           return true;
@@ -384,6 +418,17 @@ export const usePetsStore = defineStore('pets', {
       }
       
       return ageString || 'Unknown';
+    },
+
+    /**
+     * Clear cache and reset state
+     */
+    clearCache() {
+      this.pets = [];
+      this.lastFetchTime = null;
+      this.currentUserId = null;
+      this.error = null;
+      this.selectedPet = null;
     }
   },
 

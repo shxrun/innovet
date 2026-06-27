@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  chatbot:
+    build: .
+    ports:
+      - "3001:3001"
+      - "5005:5005"
+      - "5055:5055"
+    environment:
+      - PORT=3001
+      - RASA_URL=http://localhost:5005
+      - NODE_ENV=development
+    volumes:
+      # Mount for development - you can remove this in production
+      - ./node-server:/app/node-server
+      - ./rasa:/app/rasa
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: Add a separate service for Rasa action server if needed
+  # rasa-actions:
+  #   build: .
+  #   command: ["rasa", "run", "actions", "--port", "5055"]
+  #   ports:
+  #     - "5055:5055"
+  #   volumes:
+  #     - ./rasa:/app/rasa
+  #   environment:
+  #     - PYTHONPATH=/app/rasa
+
+

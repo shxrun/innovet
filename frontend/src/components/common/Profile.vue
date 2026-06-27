@@ -234,22 +234,24 @@
                   </div>
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-0 sm:mb-1">Phone</label>
-                    <input
-                      v-model="form.phone"
-                      type="tel"
-                      placeholder="Enter phone number"
-                      class="w-full px-2 sm:px-3 py-0.5 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-200 h-8 sm:h-12 text-sm sm:text-base"
-                    />
+                    <div class="flex gap-2">
+                      <input
+                        v-model="form.phone"
+                        type="tel"
+                        placeholder="Enter phone number"
+                        class="flex-1 px-2 sm:px-3 py-0.5 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-200 h-8 sm:h-12 text-sm sm:text-base"
+                        readonly
+                      />
+                      <button
+                        @click="openPhoneChangeModal"
+                        type="button"
+                        class="px-2 sm:px-4 py-0.5 sm:py-2 bg-blue-500 text-white text-xs sm:text-sm rounded-full hover:bg-blue-700 transition-colors whitespace-nowrap h-8 sm:h-12"
+                      >
+                        Change
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-0 sm:mb-1">WhatsApp</label>
-                    <input
-                      v-model="form.whatsapp"
-                      type="tel"
-                      placeholder="Enter WhatsApp number"
-                      class="w-full px-2 sm:px-3 py-0.5 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-200 h-8 sm:h-12 text-sm sm:text-base"
-                    />
-                  </div>
+
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-0 sm:mb-1">Alternative Email</label>
                     <input
@@ -381,6 +383,15 @@
   
   <!-- Loading Spinner for operations (not initial loading) -->
   <LoadingSpinner v-if="loading && !initialLoading" isOverlay text="Processing..." />
+  
+  <!-- Phone Number Change Modal -->
+  <PhoneNumberChangeModal
+    v-if="showPhoneChangeModal"
+    :current-phone="form.phone"
+    :is-open="showPhoneChangeModal"
+    @close="closePhoneChangeModal"
+    @phone-changed="handlePhoneChanged"
+  />
 </template>
   
 <script setup>
@@ -398,6 +409,7 @@ import {
 import { useAuthStore } from '@/stores/modules/authStore';
 import { useProfileStore } from '@/stores/modules/profileStore';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
+import PhoneNumberChangeModal from '@/components/common/PhoneNumberChangeModal.vue';
 // Import Firebase Storage functions
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@shared/firebase';
@@ -444,6 +456,9 @@ const showErrorModal = ref(false);
 const statusMessage = ref('');
 const errorMessage = ref('');
 
+// Phone change modal state
+const showPhoneChangeModal = ref(false);
+
 // Declare google variable
 let google;
 
@@ -487,6 +502,24 @@ watch(form, (newForm) => {
   profileStore.calculateCompletionPercentage(newForm);
 }, { deep: true });
 
+// Watch for authStore changes to ensure email is always available
+watch(() => authStore.user, (newUser) => {
+  if (newUser && newUser.email && (!form.value.email || form.value.email !== newUser.email)) {
+    console.log('AuthStore user changed, updating email in form:', newUser.email);
+    form.value.email = newUser.email;
+    displayedProfile.value.email = newUser.email;
+  }
+}, { immediate: true });
+
+// Additional safety check - force email update if it's missing
+watch(() => form.value.email, (newEmail) => {
+  if (!newEmail && authStore.user?.email) {
+    console.log('Email is missing in form, forcing update from authStore:', authStore.user.email);
+    form.value.email = authStore.user.email;
+    displayedProfile.value.email = authStore.user.email;
+  }
+}, { immediate: true });
+
 const loadGoogleMapsAPI = () => {
   if (typeof google === 'undefined') {
     const script = document.createElement('script');
@@ -508,15 +541,65 @@ const fetchUserProfile = async () => {
   try {
     const profile = await profileStore.fetchUserProfile(authStore.user.userId);
     if (profile) {
-      form.value = { ...profile };
-      tempForm.value = { ...profile };
-      displayedProfile.value = { ...profile };
-      dateInput.value = profile.dateOfBirth || '';
+      // Merge profile data with authStore data to ensure email is always available
+      const mergedProfile = {
+        ...profile,
+        // Ensure email is always from authStore (Google login provides this)
+        email: authStore.user?.email || profile.email || '',
+        // Ensure other auth data is also available
+        firstName: profile.firstName || authStore.user?.firstName || '',
+        lastName: profile.lastName || authStore.user?.lastName || '',
+        photoURL: profile.photoURL || authStore.user?.photoURL || '',
+        role: profile.role || authStore.user?.role || 'user'
+      };
+      
+      // If email is still empty, try to get it from the original Firebase user
+      if (!mergedProfile.email && authStore.user?.uid) {
+        console.warn('Email is still empty, checking Firebase user data...');
+        // This is a fallback - the email should be in authStore.user.email
+        console.log('AuthStore user object:', authStore.user);
+        console.log('AuthStore user email property:', authStore.user.email);
+        console.log('AuthStore user keys:', Object.keys(authStore.user));
+        
+        // Try to get email from the original Firebase user object
+        if (authStore.user.email) {
+          console.log('Found email in authStore.user.email, updating form...');
+          form.value.email = authStore.user.email;
+          displayedProfile.value.email = authStore.user.email;
+        } else {
+          // Try to refresh the email from Firebase
+          console.log('Attempting to refresh email from Firebase...');
+          try {
+            const refreshedEmail = await authStore.refreshUserEmail();
+            if (refreshedEmail) {
+              console.log('Email refreshed successfully:', refreshedEmail);
+              form.value.email = refreshedEmail;
+              displayedProfile.value.email = refreshedEmail;
+            }
+          } catch (error) {
+            console.error('Error refreshing email:', error);
+          }
+        }
+      }
+      
+      form.value = { ...mergedProfile };
+      tempForm.value = { ...mergedProfile };
+      displayedProfile.value = { ...mergedProfile };
+      dateInput.value = mergedProfile.dateOfBirth || '';
       
       // Reset photo change tracking
       selectedProfilePicture.value = null;
       previewPhotoURL.value = null;
       photoChanged.value = false;
+      
+      console.log('Profile loaded with merged data:', {
+        email: mergedProfile.email,
+        firstName: mergedProfile.firstName,
+        lastName: mergedProfile.lastName,
+        role: mergedProfile.role,
+        authStoreEmail: authStore.user?.email,
+        profileStoreEmail: profile.email
+      });
     }
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -527,9 +610,18 @@ const fetchUserProfile = async () => {
 onMounted(async () => {
   initialLoading.value = true;
   try {
+    console.log('Profile.vue onMounted - AuthStore user data:', {
+      userId: authStore.user?.userId,
+      email: authStore.user?.email,
+      firstName: authStore.user?.firstName,
+      lastName: authStore.user?.lastName,
+      role: authStore.user?.role
+    });
+    
     if (authStore.user && authStore.user.userId) {
       await fetchUserProfile();
     }
+    
     document.addEventListener('click', handleClickOutside);
     window.addEventListener('resize', handleResize);
     document.addEventListener('keydown', handleKeyDown);
@@ -692,7 +784,7 @@ const calculateProgress = computed(() => {
   const addressFields = ['streetAddress', 'city', 'province', 'country'];
   
   // Optional fields that contribute to progress but aren't required for 100%
-  const optionalFields = ['whatsapp', 'alternativeEmail', 'postalCode'];
+  const optionalFields = ['alternativeEmail', 'postalCode'];
   
   // Photo is considered a separate field
   const hasPhoto = photoChanged.value ? !!previewPhotoURL.value : !!form.value.photoURL;
@@ -973,6 +1065,9 @@ const handleKeyDown = (event) => {
     if (showErrorModal.value) {
       showErrorModal.value = false;
     }
+    if (showPhoneChangeModal.value) {
+      showPhoneChangeModal.value = false;
+    }
   }
 };
 
@@ -981,10 +1076,35 @@ const handleAgeInput = (event) => {
   tempForm.value.age = event.target.value;
 };
 
+// Phone change modal methods
+const openPhoneChangeModal = () => {
+  showPhoneChangeModal.value = true;
+};
+
+const closePhoneChangeModal = () => {
+  showPhoneChangeModal.value = false;
+};
+
+const handlePhoneChanged = (newPhone) => {
+  form.value.phone = newPhone;
+  displayedProfile.value.phone = newPhone;
+  statusMessage.value = 'Phone number updated successfully!';
+  showSuccessModal.value = true;
+};
+
 // Add a watch effect to update age when date of birth changes
 watch(() => tempForm.value.dateOfBirth, (newDateOfBirth) => {
   if (/^\d{4}-\d{2}-\d{2}$/.test(newDateOfBirth)) {
     tempForm.value.age = calculateAge(newDateOfBirth);
+  }
+});
+
+// Prevent body scroll when phone change modal is open
+watch(showPhoneChangeModal, (isOpen) => {
+  if (isOpen) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
   }
 });
 

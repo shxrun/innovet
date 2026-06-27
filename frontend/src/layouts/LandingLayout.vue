@@ -7,10 +7,14 @@
         <router-view></router-view>
       </main>
       <Footer/>
+      
+      <!-- Chatbot Component -->
+      <Chatbot />
     </div>
   </template>
   
   <script setup>
   import Navbar from '@/components/common/Header.vue'
   import Footer from '@/components/common/Footer.vue'
+  import Chatbot from '@/components/common/Chatbot.vue'
   </script>

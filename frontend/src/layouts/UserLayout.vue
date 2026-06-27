@@ -38,10 +38,8 @@
       </div>
     </div>
     
-    <!-- Chatbot Button - Now visible on all devices with custom positioning -->
-    <div class="chatbot-wrapper">
-      <ChatbotButton @toggle="toggleChatbot" :isVisible="true" />
-    </div>
+    <!-- Chatbot Component - Direct usage for proper dragging functionality -->
+    <ChatbotButton @toggle="toggleChatbot" :isVisible="true" />
     
     <!-- Push Notification Modal -->
     <PushNotificationModal 
@@ -52,6 +50,7 @@
     />
   </div>
 </template>
+
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
@@ -66,6 +65,7 @@ import { db } from '@shared/firebase';
 import { useAuthStore } from '@/stores/modules/authStore';
 import notificationService from '@/services/notificationService';
 
+
 const route = useRoute();
 const authStore = useAuthStore();
 const isSidebarOpen = ref(true);
@@ -73,6 +73,7 @@ const isMobileView = ref(false);
 const isSearchOpen = ref(false);
 const isNotificationsOpen = ref(false);
 const showNotificationModal = ref(false);
+
 
 // Watch for route changes to detect if we need to open the notifications panel
 watch(() => route.path, (newPath) => {
@@ -82,14 +83,17 @@ watch(() => route.path, (newPath) => {
   }
 });
 
+
 const toggleSidebar = (value) => {
   isSidebarOpen.value = typeof value === 'boolean' ? value : !isSidebarOpen.value;
 };
+
 
 const toggleChatbot = () => {
   // Add your chatbot toggle logic here
   console.log('Chatbot toggled');
 };
+
 
 const toggleSearch = (value) => {
   isSearchOpen.value = value;
@@ -98,6 +102,7 @@ const toggleSearch = (value) => {
   }
 };
 
+
 const toggleNotifications = (value) => {
   isNotificationsOpen.value = value;
   if (value) {
@@ -105,11 +110,13 @@ const toggleNotifications = (value) => {
   }
 };
 
+
 // Notification modal methods
 const closeNotificationModal = () => {
   showNotificationModal.value = false;
   localStorage.removeItem('showNotificationModal');
 };
+
 
 const handleNotificationsEnabled = async (success) => {
   console.log('Notifications enabled:', success);
@@ -130,6 +137,7 @@ const handleNotificationsEnabled = async (success) => {
   }
 };
 
+
 const handleNotificationsSkipped = async () => {
   console.log('Notifications skipped');
   try {
@@ -149,6 +157,7 @@ const handleNotificationsSkipped = async () => {
   }
 };
 
+
 const checkMobile = () => {
   isMobileView.value = window.innerWidth < 768;
   if (isMobileView.value) {
@@ -156,11 +165,13 @@ const checkMobile = () => {
   }
 };
 
+
 const mainContentStyle = computed(() => ({
   height: isMobileView.value ? 'calc(100vh - 8rem)' : 'auto',
   paddingTop: isMobileView.value ? '2.5rem' : '1rem', // Increased from 1rem to 2.5rem for mobile
   paddingBottom: isMobileView.value ? '5rem' : '1rem'
 }));
+
 
 onMounted(() => {
   checkMobile();
@@ -195,6 +206,7 @@ onMounted(() => {
   }
 });
 
+
 // Watch for auth store changes
 watch(() => authStore.currentUser, (newUser) => {
   if (newUser) {
@@ -202,10 +214,12 @@ watch(() => authStore.currentUser, (newUser) => {
   }
 });
 
+
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile);
 });
 </script>
+
 
 <style scoped>
 @supports(padding-top: env(safe-area-inset-top)) {
@@ -217,21 +231,9 @@ onUnmounted(() => {
   }
 }
 
-/* Custom positioning for the chatbot button */
-.chatbot-wrapper {
-  position: fixed;
-  right: 20px;
-  bottom: 100px; /* Higher position from the bottom */
-  z-index: 50; /* Make sure it's above other elements */
-}
 
-/* Adjust position for mobile devices */
-@media (max-width: 767px) {
-  .chatbot-wrapper {
-    bottom: 300px; /* Much higher on mobile to avoid the bottom navigation */
-    right: 16px;
-  }
-}
+/* Chatbot positioning is now handled by the component itself */
+
 
 /* Additional mobile optimizations */
 @media (max-width: 767px) {

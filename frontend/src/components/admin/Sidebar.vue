@@ -6,7 +6,7 @@
     :class="{ 
       'w-64': isOpen, 
       'w-16': !isOpen && !isSmallScreen,
-      'w-0': !isOpen && isSmallScreen,
+      'w-0 left-[-100%] opacity-0 pointer-events-none': !isOpen && isSmallScreen,
       'left-4': !isSmallScreen,
       'mx-4': isSmallScreen
     }"
@@ -14,14 +14,14 @@
     <template v-if="isOpen || !isSmallScreen">
       <!-- Logo and Toggle Button (Shows at top when expanded) -->
       <div v-if="isOpen" class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-        <h1 class="text-xl font-semibold text-blue-600">ProVet</h1>
+        <h1 class="text-xl font-semibold text-blue-600">InnoVet</h1>
         <button @click="handleToggle" 
                 class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200">
           <PanelLeftClose class="w-5 h-5" />
         </button>
       </div>
       <div v-else class="px-4 py-4 border-b border-gray-200">
-        <img src="@/assets/media/images/landing/provetblue.png" alt="ProVet Logo" class="w-8 h-8 mx-auto" />
+        <img src="@/assets/media/images/logo/innovetlogo.png" alt="InnoVet Logo" class="w-8 h-8 mx-auto" />
       </div>
       <!-- Navigation -->
       <nav class="flex-grow p-4 space-y-2 overflow-y-auto" :class="{ 'overflow-hidden': !isOpen }">
@@ -212,12 +212,12 @@ const navItems = [
     label: 'Dashboard', 
     iconProps: { icon: "mage:dashboard-bar-notification", width: 20, height: 20 } 
   },
-  { 
-    href: '/admin/analytics', 
-    icon: Icon, 
-    label: 'Analytics', 
-    iconProps: { icon: "lucide:chart-pie", width: 20, height: 20 } 
-  },
+  // { 
+  //   href: '/admin/analytics', 
+  //   icon: Icon, 
+  //   label: 'Analytics', 
+  //   iconProps: { icon: "lucide:chart-pie", width: 20, height: 20 } 
+  // },
   { 
     href: '/admin/usermanagement', 
     icon: Users, 
@@ -240,14 +240,14 @@ const navItems = [
       { href: '/admin/datamanagement/veterinarians', label: 'Veterinarians' }
     ]
   },
-  { 
-    icon: MessageCircleCode,
-    label: 'Chatbot',
-    subItems: [
-      { href: '/admin/chatbot/chatlogs', label: 'Chat Logs' },
-      { href: '/admin/chatbot/responses', label: 'Responses' }
-    ]
-  },
+  // { 
+  //   icon: MessageCircleCode,
+  //   label: 'Chatbot',
+  //   subItems: [
+  //     { href: '/admin/chatbot/chatlogs', label: 'Chat Logs' },
+  //     { href: '/admin/chatbot/responses', label: 'Responses' }
+  //   ]
+  // },
   { 
     icon: Building,
     label: 'Office',

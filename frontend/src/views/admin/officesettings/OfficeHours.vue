@@ -94,16 +94,16 @@
                     {{ hours.isOpen ? 'Open' : 'Closed' }}
                   </span>
                 </td>
-                <td class="py-4 px-6 text-sm text-gray-900 hidden sm:table-cell">{{ formatTime(hours.openTime) }}</td>
-                <td class="py-4 px-6 text-sm text-gray-900 hidden sm:table-cell">{{ formatTime(hours.closeTime) }}</td>
-                <td class="py-4 px-6 text-sm text-gray-900 hidden md:table-cell">
+                <td class="py-4 px-6 text-sm text-gray-900">{{ formatTime(hours.openTime) }}</td>
+                <td class="py-4 px-6 text-sm text-gray-900">{{ formatTime(hours.closeTime) }}</td>
+                <td class="py-4 px-6 text-sm text-gray-900">
                   {{ hours.lunchStart && hours.lunchEnd ? `${formatTime(hours.lunchStart)} - ${formatTime(hours.lunchEnd)}` : 'N/A' }}
                 </td>
-                <td class="py-4 px-6 text-sm text-gray-900 hidden lg:table-cell">{{ hours.notes || 'N/A' }}</td>
-                <td class="py-4 px-6 text-sm text-gray-600 hidden md:table-cell">
+                <td class="py-4 px-6 text-sm text-gray-900">{{ hours.notes || 'N/A' }}</td>
+                <td class="py-4 px-6 text-sm text-gray-600">
                   {{ formatTimestamp(hours.createdAt) }}
                 </td>
-                <td class="py-4 px-6 text-sm text-gray-600 hidden md:table-cell">
+                <td class="py-4 px-6 text-sm text-gray-600">
                   {{ formatTimestamp(hours.updatedAt) }}
                 </td>
                 <td class="py-4 px-6 text-sm">
@@ -317,11 +317,11 @@
                     {{ formatHolidayType(holiday.type) }}
                   </span>
                 </td>
-                <td class="py-4 px-6 text-sm text-gray-900 hidden md:table-cell">{{ holiday.description || 'N/A' }}</td>
-                <td class="py-4 px-6 text-sm text-gray-600 hidden md:table-cell">
+                <td class="py-4 px-6 text-sm text-gray-900">{{ holiday.description || 'N/A' }}</td>
+                <td class="py-4 px-6 text-sm text-gray-600">
                   {{ formatTimestamp(holiday.createdAt) }}
                 </td>
-                <td class="py-4 px-6 text-sm text-gray-600 hidden md:table-cell">
+                <td class="py-4 px-6 text-sm text-gray-600">
                   {{ formatTimestamp(holiday.updatedAt) }}
                 </td>
                 <td class="py-4 px-6 text-sm">

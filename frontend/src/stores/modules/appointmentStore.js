@@ -27,7 +27,10 @@ export const useAppointmentStore = defineStore('appointment', {
     loading: false,
     error: null,
     lastVisible: null,
-    hasMore: true
+    hasMore: true,
+    lastFetchTime: null,
+    cacheExpiry: 5 * 60 * 1000, // 5 minutes cache expiry
+    currentUserId: null
   }),
 
   getters: {
@@ -104,6 +107,22 @@ export const useAppointmentStore = defineStore('appointment', {
   },
 
   actions: {
+    /**
+     * Check if cached data is still valid
+     * @param {string} userId - The user ID to check cache for
+     * @returns {boolean} - True if cache is valid, false otherwise
+     */
+    isDataCached(userId) {
+      if (!this.lastFetchTime || this.currentUserId !== userId) {
+        return false;
+      }
+      
+      const now = Date.now();
+      const timeSinceLastFetch = now - this.lastFetchTime;
+      
+      return timeSinceLastFetch < this.cacheExpiry;
+    },
+
     /**
      * Parse appointment time and get the end time as a Date object
      * @param {Object} appointment - The appointment object
@@ -273,7 +292,13 @@ export const useAppointmentStore = defineStore('appointment', {
      * @param {string} userId - The user ID
      * @returns {Array} - Array of appointments
      */
-    async fetchAppointmentsByUserId(userId) {
+    async fetchAppointmentsByUserId(userId, forceRefresh = false) {
+      // Check if we have valid cached data
+      if (!forceRefresh && this.isDataCached(userId)) {
+        console.log('Using cached appointments data for userId:', userId);
+        return this.appointments;
+      }
+
       this.loading = true;
       this.error = null;
       
@@ -305,6 +330,8 @@ export const useAppointmentStore = defineStore('appointment', {
         });
         
         this.appointments = appointments;
+        this.lastFetchTime = Date.now();
+        this.currentUserId = userId;
         
         // Check for expired appointments after fetching
         await this.checkExpiredAppointments();
@@ -554,6 +581,10 @@ export const useAppointmentStore = defineStore('appointment', {
         
         // Update local state
         this.appointments.unshift(formattedData);
+        
+        // Invalidate cache since we added new data
+        this.lastFetchTime = null;
+        
         return formattedData;
       } catch (error) {
         console.error('Error adding appointment:', error);
@@ -609,6 +640,9 @@ export const useAppointmentStore = defineStore('appointment', {
           this.currentAppointment = formattedData;
         }
         
+        // Invalidate cache since we updated data
+        this.lastFetchTime = null;
+        
         return formattedData;
       } catch (error) {
         console.error('Error updating appointment:', error);
@@ -641,6 +675,9 @@ export const useAppointmentStore = defineStore('appointment', {
           this.currentAppointment = null;
         }
         
+        // Invalidate cache since we deleted data
+        this.lastFetchTime = null;
+        
         return true;
       } catch (error) {
         console.error('Error deleting appointment:', error);
@@ -669,6 +706,62 @@ export const useAppointmentStore = defineStore('appointment', {
       this.currentAppointment = null;
       this.error = null;
       this.loading = false;
+      this.lastVisible = null;
+      this.hasMore = true;
+    },
+
+    /**
+     * Save appointment feedback
+     * @param {Object} feedbackData - The feedback data
+     * @returns {Object|null} - The saved feedback object or null if failed
+     */
+    async saveAppointmentFeedback(feedbackData) {
+      this.loading = true;
+      this.error = null;
+      
+      try {
+        const db = getFirestore();
+        const feedbackRef = collection(db, 'appointment_feedback');
+        
+        // Add server timestamp
+        const feedbackWithTimestamp = {
+          ...feedbackData,
+          createdAt: serverTimestamp()
+        };
+        
+        const docRef = await addDoc(feedbackRef, feedbackWithTimestamp);
+        
+        // Get the saved document
+        const savedFeedbackDoc = await getDoc(docRef);
+        const savedFeedbackData = savedFeedbackDoc.data();
+        
+        // Convert Firestore timestamps to JavaScript Date objects
+        const formattedFeedback = {
+          id: docRef.id,
+          ...savedFeedbackData,
+          submittedAt: savedFeedbackData.submittedAt instanceof Timestamp ? savedFeedbackData.submittedAt.toDate() : savedFeedbackData.submittedAt,
+          createdAt: savedFeedbackData.createdAt instanceof Timestamp ? savedFeedbackData.createdAt.toDate() : new Date()
+        };
+        
+        return formattedFeedback;
+      } catch (error) {
+        console.error('Error saving appointment feedback:', error);
+        this.error = error.message;
+        return null;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    /**
+     * Clear cache and reset state
+     */
+    clearCache() {
+      this.appointments = [];
+      this.lastFetchTime = null;
+      this.currentUserId = null;
+      this.error = null;
+      this.currentAppointment = null;
       this.lastVisible = null;
       this.hasMore = true;
     }

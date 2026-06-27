@@ -5,8 +5,10 @@
     <VeterinarySidebar 
       :isOpen="isSidebarOpen" 
       @toggle="toggleSidebar"
-      :isSmallScreen="isSmallScreen"
       @item-click="handleSidebarItemClick"
+      :isSmallScreen="isSmallScreen"
+      :currentRoute="currentRoute"
+      :navItems="navItems"
       :class="[
         'transition-all duration-300 ease-in-out fixed inset-y-0 left-0 z-[70]',
         { 'translate-x-0': isSidebarOpen || !isSmallScreen, '-translate-x-full': !isSidebarOpen && isSmallScreen }
@@ -32,6 +34,8 @@
           :isSidebarOpen="isSidebarOpen"
           @toggle-sidebar="toggleSidebar"
           :isSmallScreen="isSmallScreen"
+          :currentRoute="currentRoute"
+          :navItems="navItems"
         />
       </div>
       
@@ -39,8 +43,6 @@
       <div class="flex-1 flex flex-col">
         <!-- Spacer to push content below fixed header -->
         <div class="h-[89px]"></div>
-        
-        <Breadcrumb class="py-4" :currentRoute="currentRoute" :navItems="navItems" />
         
         <main class="flex-1 py-4 overflow-y-auto">
           <div class="w-full">
@@ -62,7 +64,7 @@
         @skipped="handleNotificationsSkipped"
       />
     </div>
-  
+
     <!-- Overlay for mobile -->
     <div 
       v-if="isSidebarOpen && isSmallScreen" 
@@ -77,7 +79,6 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import VeterinarySidebar from '@/components/veterinary/Sidebar.vue';
 import Header from '@/components/veterinary/Header.vue';
-import Breadcrumb from '@/components/common/Breadcrumb.vue';
 import PushNotificationModal from '@/components/common/PushNotificationModal.vue';
 import {
   LayoutDashboard,
@@ -92,6 +93,7 @@ import {
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@shared/firebase';
 import { useAuthStore } from '@/stores/modules/authStore';
+import { useProfileStore } from '@/stores/modules/profileStore';
 import notificationService from '@/services/notificationService';
 
 const isSidebarOpen = ref(window.innerWidth >= 768);
@@ -100,6 +102,7 @@ const headerContainer = ref(null);
 const isSmallScreen = ref(false);
 const showNotificationModal = ref(false);
 const authStore = useAuthStore();
+const profileStore = useProfileStore();
 
 const toggleBodyScroll = (disable) => {
   if (disable) {
@@ -116,18 +119,35 @@ const toggleSidebar = () => {
   }
 };
 
+const handleSidebarItemClick = () => {
+  if (isSmallScreen.value) {
+    isSidebarOpen.value = false;
+    toggleBodyScroll(false);
+  }
+};
+
 const route = useRoute();
 const currentRoute = computed(() => route.path);
 
+// Navigation items for the sidebar
 const navItems = [
-  { href: '/veterinary/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/veterinary/appointments', icon: Calendar, label: 'Appointments' },
-  { href: '/veterinary/patients', icon: Users, label: 'Patients' },
-  { href: '/veterinary/consultations', icon: Stethoscope, label: 'Consultations' },
-  { href: '/veterinary/medical-records', icon: FileText, label: 'Medical Records' },
-  { href: '/veterinary/messages', icon: MessageSquare, label: 'Messages' },
-  { href: '/veterinary/settings', icon: Settings, label: 'Settings' },
-  { href: '/veterinary/profile', icon: UserCircle, label: 'Profile' },
+  { href: '/vet/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/vet/vetclientpets', icon: Users, label: 'Clients & Pets' },
+  { 
+    icon: Calendar,
+    label: 'Appointments',
+    subItems: [
+      { href: '/vet/appointments/vetappointmentapproval', icon: Calendar, label: 'Appointments' },
+      { href: '/vet/appointments/vetcalendar', icon: Calendar, label: 'Calendar' },
+    ]
+  },
+  { href: '/vet/queue', icon: Stethoscope, label: 'Queue' },
+  { href: '/vet/vetfeedback', icon: MessageSquare, label: 'Feedback' },
+  { href: '/vet/vettelehealth', icon: Stethoscope, label: 'Telehealth' },
+  { href: '/vet/medicalrecords', icon: FileText, label: 'Medical Records' },
+  { href: '/vet/vethealthriskassessment', icon: Stethoscope, label: 'Health Risk Assessment' },
+  { href: '/vet/veteducationalresources', icon: FileText, label: 'Educational Resources'},
+  { href: '/vet/settings', icon: Settings, label: 'Settings' },
 ];
 
 // Notification modal methods
@@ -195,36 +215,24 @@ const closeSidebarOnMobile = () => {
   }
 };
 
-const handleSidebarItemClick = () => {
-  if (isSmallScreen.value) {
-    isSidebarOpen.value = false;
-    toggleBodyScroll(false);
-  }
-};
-
 watch(isSmallScreen, (newValue) => {
   if (!newValue) {
     toggleBodyScroll(false);
   }
 });
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('scroll', handleScroll, { passive: true });
   window.addEventListener('resize', handleResize);
   handleResize(); // Initial check
   
-  // Initialize notification service
-  try {
-    notificationService.initialize().catch(err => {
-      console.error('Error initializing notification service:', err);
-    });
-    
-    // Store current user in window object for access by notification service
-    if (authStore.currentUser) {
-      window.currentUser = authStore.currentUser;
+  // Load current user's profile data
+  if (authStore.user?.userId) {
+    try {
+      await profileStore.fetchUserProfile(authStore.user.userId);
+    } catch (error) {
+      console.error('Error loading profile in veterinary layout:', error);
     }
-  } catch (error) {
-    console.error('Failed to initialize notification service:', error);
   }
   
   // Check if we should show the notification modal
@@ -238,11 +246,15 @@ onMounted(() => {
 });
 
 // Watch for auth store changes
-watch(() => authStore.currentUser, (newUser) => {
-  if (newUser) {
-    window.currentUser = newUser;
+watch(() => authStore.currentUser, async (newUser) => {
+  if (newUser?.userId) {
+    try {
+      await profileStore.fetchUserProfile(newUser.userId);
+    } catch (error) {
+      console.error('Error loading profile in veterinary layout watch:', error);
+    }
   }
-});
+}, { immediate: true });
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll);

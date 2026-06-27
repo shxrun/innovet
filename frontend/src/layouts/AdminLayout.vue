@@ -33,6 +33,8 @@
           @toggle-sidebar="toggleSidebar"
           :isSticky="headerTopPosition === 0"
           :isSmallScreen="isSmallScreen"
+          :currentRoute="currentRoute"
+          :navItems="navItems"
         />
       </div>
       
@@ -40,8 +42,6 @@
       <div class="flex-1 flex flex-col">
         <!-- Spacer to push content below fixed header -->
         <div class="h-[89px]"></div>
-        
-        <Breadcrumb class="py-4" :currentRoute="currentRoute" :navItems="navItems" />
         
         <main class="flex-1 py-4 overflow-y-auto">
           <div class="w-full">
@@ -89,11 +89,13 @@ import {
   Video,
   MessageSquare,
   Settings,
-  UserCircle
+  UserCircle,
+  Building
 } from 'lucide-vue-next';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@shared/firebase';
 import { useAuthStore } from '@/stores/modules/authStore';
+import { useProfileStore } from '@/stores/modules/profileStore';
 import notificationService from '@/services/notificationService';
 
 const isSidebarOpen = ref(window.innerWidth >= 768);
@@ -102,6 +104,7 @@ const headerContainer = ref(null);
 const isSmallScreen = ref(false);
 const showNotificationModal = ref(false);
 const authStore = useAuthStore();
+const profileStore = useProfileStore();
 
 const toggleBodyScroll = (disable) => {
   if (disable) {
@@ -123,12 +126,13 @@ const currentRoute = computed(() => route.path);
 
 const navItems = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/admin/analytics', icon: BarChart, label: 'Analytics' },
+  // { href: '/admin/analytics', icon: BarChart, label: 'Analytics' },
   { href: '/admin/appointments', icon: Calendar, label: 'Appointments' },
   { href: '/admin/usermanagement', icon: Users, label: 'User Management' },
   { href: '/admin/datamanagement', icon: Database, label: 'Data Management' },
   { href: '/admin/telehealth', icon: Video, label: 'Telehealth' },
-  { href: '/admin/chatbot', icon: MessageSquare, label: 'Chatbot' },
+  // { href: '/admin/chatbot', icon: MessageSquare, label: 'Chatbot' },
+  { href: '/admin/office-settings', icon: Building, label: 'Office Settings' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
   { href: '/admin/profile', icon: UserCircle, label: 'Profile' },
 ];
@@ -211,23 +215,18 @@ watch(isSmallScreen, (newValue) => {
   }
 });
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('scroll', handleScroll, { passive: true });
   window.addEventListener('resize', handleResize);
   handleResize(); // Initial check
   
-  // Initialize notification service
-  try {
-    notificationService.initialize().catch(err => {
-      console.error('Error initializing notification service:', err);
-    });
-    
-    // Store current user in window object for access by notification service
-    if (authStore.currentUser) {
-      window.currentUser = authStore.currentUser;
+  // Load current user's profile data
+  if (authStore.user?.userId) {
+    try {
+      await profileStore.fetchUserProfile(authStore.user.userId);
+    } catch (error) {
+      console.error('Error loading profile in admin layout:', error);
     }
-  } catch (error) {
-    console.error('Failed to initialize notification service:', error);
   }
   
   // Check if we should show the notification modal
@@ -241,11 +240,15 @@ onMounted(() => {
 });
 
 // Watch for auth store changes
-watch(() => authStore.currentUser, (newUser) => {
-  if (newUser) {
-    window.currentUser = newUser;
+watch(() => authStore.currentUser, async (newUser) => {
+  if (newUser?.userId) {
+    try {
+      await profileStore.fetchUserProfile(newUser.userId);
+    } catch (error) {
+      console.error('Error loading profile in admin layout watch:', error);
+    }
   }
-});
+}, { immediate: true });
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll);

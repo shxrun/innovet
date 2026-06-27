@@ -2,44 +2,54 @@
 <template>
   <header data-header class="w-full bg-white rounded-2xl shadow-sm border border-gray-200">
     <div class="flex items-center justify-between h-16 px-6">
-      <!-- Sidebar toggle button for small screens -->
-      <button
-        v-if="isSmallScreen"
-        @click="$emit('toggle-sidebar')"
-        class="text-gray-500 hover:text-gray-700 transition-colors duration-200"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
-        </svg>
-      </button>
+      <!-- LEFT SECTION: Sidebar toggle + Breadcrumb -->
+      <div class="flex items-center gap-4 overflow-x-auto">
+        <!-- Sidebar toggle button for small screens -->
+        <button
+          v-if="isSmallScreen"
+          @click="$emit('toggle-sidebar')"
+          class="text-gray-500 hover:text-gray-700 transition-colors duration-200 flex-shrink-0"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+          </svg>
+        </button>
 
-      <!-- Spacer for larger screens -->
-      <div v-else class="w-6"></div>
+        <!-- Breadcrumb component -->
+        <Breadcrumb 
+          :currentRoute="currentRoute" 
+          :navItems="navItems" 
+          class="hidden md:flex min-w-0 flex-1" 
+        />
+      </div>
 
-      <div class="flex items-center gap-4 md:gap-6">
+      <!-- RIGHT SECTION: Queue + Notifications + Profile -->
+      <div class="flex items-center gap-4 md:gap-6 flex-shrink-0">
         <!-- Notifications Dropdown -->
         <div class="relative">
           <button
             @click="toggleNotifications"
-            class="text-gray-500 hover:text-gray-700 transition-colors duration-200 relative"
+            class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors relative"
           >
-            <BellIcon class="h-5 w-5" />
-            <span v-if="totalNotificationsCount > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-              {{ totalNotificationsCount }}
-            </span>
-          </button>
-
-          <div
-            v-if="isNotificationsOpen"
-            class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50"
-          >
-            <div v-if="totalNotificationsCount === 0" class="px-4 py-2 text-sm text-gray-700">No new notifications</div>
-            <div v-else>
-              <!-- Notification content -->
+            <BellIcon class="w-5 h-5" />
+            <!-- Notification indicator -->
+            <div v-if="unreadCount > 0" class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+              {{ unreadCount > 9 ? '9+' : unreadCount }}
             </div>
-          </div>
+          </button>
+          
+          <!-- Reuse common NotificationPanel -->
+          <NotificationPanel
+            :isMobileView="isSmallScreen"
+            :isVisible="isNotificationsOpen"
+            :isRightPanel="true"
+            topOffset="top-16"
+            heightClass="h-[calc(100vh-4rem)]"
+            :showActionButton="true"
+            :isVetContext="true"
+            @close="isNotificationsOpen = false"
+          />
         </div>
-
 
         <!-- Profile Dropdown -->
         <div class="relative">
@@ -51,7 +61,7 @@
           >
             <div class="relative">
               <img
-                :src="authStore.currentUser?.photoURL || 'https://via.placeholder.com/40'"
+                :src="userPhotoURL"
                 :alt="authStore.currentUser?.role || 'Veterinary'"
                 class="w-9 h-9 rounded-xl object-cover ring-2 ring-gray-100"
               />
@@ -72,7 +82,7 @@
                 @click="closeDropdown"
               >
                 <img
-                  :src="authStore.currentUser?.photoURL || 'https://via.placeholder.com/40'"
+                  :src="userPhotoURL"
                   alt="Current profile"
                   class="h-8 w-8 rounded-full"
                 />
@@ -130,6 +140,9 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/modules/authStore';
 import { useProfileStore } from '@/stores/modules/profileStore';
+import { useNotificationsStore } from '@/stores/modules/notifications';
+import Breadcrumb from '@/components/common/Breadcrumb.vue';
+import NotificationPanel from '@/components/common/NotificationPanel.vue';
 import { 
   ChevronDownIcon,
   ChevronRightIcon,
@@ -146,7 +159,15 @@ const props = defineProps({
   isSmallScreen: {
     type: Boolean,
     required: true
-  }
+  },
+  currentRoute: {
+    type: String,
+    required: true
+  },
+  navItems: {
+    type: Array,
+    required: true
+  },
 });
 
 const emit = defineEmits(['toggle-sidebar']);
@@ -157,24 +178,54 @@ const profileStore = useProfileStore();
 
 const isDropdownOpen = ref(false);
 const isNotificationsOpen = ref(false);
+const notificationsStore = useNotificationsStore();
+let unsubscribe = null;
 
 const userPhotoURL = computed(() => {
-  return profileStore.profile?.photoURL || 'https://via.placeholder.com/40';
+  // Try profileStore first, then fallback to authStore, then default placeholder
+  const profilePhoto = profileStore.profile?.photoURL;
+  const authPhoto = authStore.user?.photoURL;
+  const defaultPhoto = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'36\' height=\'36\' viewBox=\'0 0 36 36\'%3E%3Crect width=\'36\' height=\'36\' fill=\'%23f0f2f5\'/%3E%3Cpath d=\'M18 20.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11ZM8 28.5c0-2.5 5-5 10-5s10 2.5 10 5\' stroke=\'%23bec3c9\' stroke-width=\'2\' fill=\'none\'/%3E%3C/svg%3E';
+  
+  console.log('Veterinary Header - Profile photo:', profilePhoto, 'Auth photo:', authPhoto);
+  return profilePhoto || authPhoto || defaultPhoto;
 });
 
-const totalNotificationsCount = ref(0);
+const vetUserId = computed(() => authStore.user?.userId || authStore.currentUser?.userId || null);
+const unreadCount = computed(() => notificationsStore.getUnreadCount || 0);
 
 onMounted(async () => {
-  if (authStore.user?.userId) {
-    await profileStore.fetchUserProfile(authStore.user.userId);
+  const id = vetUserId.value;
+  if (id) {
+    try {
+      await profileStore.fetchUserProfile(id);
+      await notificationsStore.fetchNotifications(id);
+      if (!unsubscribe) {
+        unsubscribe = notificationsStore.subscribeToNotifications(id);
+      }
+    } catch (error) {
+      console.error('Error initializing header:', error);
+    }
   }
 });
 
-watch(() => authStore.user, async (newUser) => {
-  if (newUser?.userId) {
-    await profileStore.fetchUserProfile(newUser.userId);
+watch(() => authStore.user, async (newUser, oldUser) => {
+  if (newUser?.userId && newUser?.userId !== oldUser?.userId) {
+    try {
+      await profileStore.fetchUserProfile(newUser.userId);
+      await notificationsStore.fetchNotifications(newUser.userId);
+      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      unsubscribe = notificationsStore.subscribeToNotifications(newUser.userId);
+    } catch (error) {
+      console.error('Error updating profile in veterinary header:', error);
+    }
   }
 }, { immediate: true });
+
+// Watch for profile changes to ensure header updates
+watch(() => profileStore.profile, (newProfile) => {
+  console.log('Profile updated in veterinary header:', newProfile?.photoURL);
+}, { deep: true });
 
 const toggleDropdown = () => {
   isDropdownOpen.value = !isDropdownOpen.value;
@@ -197,12 +248,11 @@ const closeDropdown = () => {
 const handleLogout = async () => {
   try {
     await authStore.logoutUser();
+    if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     closeDropdown();
     router.push('/auth/login');
   } catch (error) {
     console.error('Logout failed:', error);
   }
 };
-
 </script>
-

@@ -623,7 +623,7 @@ try {
   fetchedAppointments.forEach(appointment => {
     // Fetch client information
     if (appointment.userId && appointment.userId !== 'guest-user') {
-      const clientPromise = profileStore.fetchUserProfile(appointment.userId)
+      const clientPromise = profileStore.fetchOtherUserProfile(appointment.userId)
         .then(userProfile => {
           if (userProfile) {
             // Update the appointment with client information

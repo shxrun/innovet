@@ -6,7 +6,7 @@
         <div>
           <div class="flex items-center mb-3">
             <img src="@/assets/media/images/logo/LogoProvet-removebg-preview.png" alt="ProVet Logo" class="h-16 w-auto mr-3">
-            <h2 class="text-2xl font-semibold">ProVet</h2>
+            <h2 class="text-2xl font-semibold">InnoVet</h2>
           </div>
           <p class="text-sm leading-relaxed">
             "Promoting responsible pet ownership, animal welfare, and sustainable livestock farming in Oriental Mindoro."
@@ -30,7 +30,7 @@
           <ul class="space-y-2 text-sm">
             <li>Provincial Veterinary Office, Oriental Mindoro</li>
             <li>(043) 123-4567</li>
-            <li>ProvinciailVeterinaryOffice@gmail.com</li>
+            <li>ProvincialVeterinaryOffice@gmail.com</li>
             <li>Mon-Fri: 8:00 AM - 5:00 PM</li>
           </ul>
         </div>
@@ -55,7 +55,7 @@
   
       <!-- Copyright -->
       <div class="border-t border-gray-500 mt-6 pt-6 text-center">
-        <p class="text-sm">&copy; 2025 ProVet. All Rights Reserved.</p>
+        <p class="text-sm">&copy; 2025 InnoVet. All Rights Reserved.</p>
       </div>
     </footer>
   </template>

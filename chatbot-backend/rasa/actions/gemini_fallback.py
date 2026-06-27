@@ -30,8 +30,10 @@ load_dotenv()
 # Set Gemini API key from environment variable or use hardcoded value
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-    
-logger.info(f"Using Gemini API key: {GEMINI_API_KEY[:5]}...")  # Log first 5 chars for security
+if GEMINI_API_KEY:
+    logger.info(f"Using Gemini API key: {GEMINI_API_KEY[:5]}...")  # Log first 5 chars for security
+else:
+    logger.warning("GEMINI_API_KEY not found in environment variables")
 
 # Initialize Firebase Admin SDK with your service account
 cred_path = os.path.join(os.path.dirname(__file__), 

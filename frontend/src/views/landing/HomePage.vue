@@ -3,29 +3,29 @@
     <!-- Hero Section with Zoom Effect (Project Moses Inspired) -->
     <section class="relative h-screen overflow-hidden">
       <!-- Background Image with Zoom Effect -->
-      <div 
-        ref="heroBackground" 
+      <div
+        ref="heroBackground"
         class="absolute inset-0 bg-cover bg-center transition-transform duration-[20000ms] ease-out"
-        :style="{ 
+        :style="{
           backgroundImage: `url(${heroImage})`,
-          transform: `scale(${zoomScale})` 
+          transform: `scale(${zoomScale})`
         }"
       ></div>
-      
+     
       <!-- Dark Overlay -->
       <div class="absolute inset-0 bg-black bg-opacity-50"></div>
-      
+     
       <!-- Content -->
       <div class="relative z-10 flex flex-col items-center justify-center h-full text-white text-center px-4">
-        <h1 
+        <h1
           class="text-5xl md:text-7xl font-bold mb-6 transition-all duration-1000"
           v-motion
           :initial="{ opacity: 0, y: 50 }"
           :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }"
         >
-          ProVET
+          InnoVET
         </h1>
-        <p 
+        <p
           class="text-xl md:text-2xl mb-8 max-w-3xl"
           v-motion
           :initial="{ opacity: 0 }"
@@ -33,8 +33,8 @@
         >
           Monitoring and Providing the Best Veterinary Care for Your Pets
         </p>
-        <router-link 
-          to="/service" 
+        <router-link
+          to="/service"
           class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-full text-lg font-semibold transition duration-300 transform hover:scale-105"
           v-motion
           :initial="{ opacity: 0, y: 20 }"
@@ -43,7 +43,7 @@
           Explore Our Services
         </router-link>
       </div>
-      
+     
       <!-- Scroll Indicator -->
       <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -52,9 +52,10 @@
       </div>
     </section>
 
+
     <!-- About Section - Updated to match About.vue design -->
     <section class="py-20 bg-white">
-      <div class="container mx-auto px-8">
+      <div class="container mx-auto px-4 md:px-8">
         <!-- Updated heading style -->
         <div class="text-center mb-16">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1"
@@ -71,18 +72,18 @@
             <span class="text-blue-500"> of Our Practice</span>
           </h2>
         </div>
-        
+       
         <!-- Updated MVM items with new design from About.vue -->
         <div class="grid md:grid-cols-3 gap-6">
-          <div v-for="(item, index) in mvmItems" 
+          <div v-for="(item, index) in mvmItems"
                :key="index"
                class="bg-blue-50/50 border border-blue-100 rounded-lg p-6 hover:shadow-md transition-all duration-300"
                v-motion
                :initial="{ opacity: 0, scale: 0.9 }"
-               :visibleOnce="{ 
-                 opacity: 1, 
-                 scale: 1, 
-                 transition: { duration: 600, delay: 200 * index } 
+               :visibleOnce="{
+                 opacity: 1,
+                 scale: 1,
+                 transition: { duration: 600, delay: 200 * index }
                }">
             <div class="flex flex-col items-center text-center">
               <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
@@ -98,10 +99,11 @@
       </div>
     </section>
 
+
    
     <!-- Services Section -->
     <section class="py-20 bg-gray-50">
-    <div class="container mx-auto px-8">
+    <div class="container mx-auto px-4 md:px-8">
       <!-- Heading with consistent style -->
       <div class="text-center mb-16">
         <p class="text-sm uppercase tracking-wider text-blue-500 mb-1"
@@ -118,12 +120,12 @@
           <span class="text-blue-500"> Services</span>
         </h2>
       </div>
-      
-      <!-- Services Grid - Fixed to ensure equal height white sections -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+     
+      <!-- Services Grid - Match spacing with Core Values section -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <!-- Walk-in Veterinary -->
-        <div 
-          class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
+        <div
+          class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
           v-motion
           :initial="{ opacity: 0, y: 30 }"
           :visibleOnce="{ opacity: 1, y: 0, transition: { duration: 600, delay: 150 } }"
@@ -144,9 +146,10 @@
           </div>
         </div>
 
+
         <!-- Elective Services -->
-        <div 
-          class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
+        <div
+          class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
           v-motion
           :initial="{ opacity: 0, y: 30 }"
           :visibleOnce="{ opacity: 1, y: 0, transition: { duration: 600, delay: 300 } }"
@@ -167,9 +170,10 @@
           </div>
         </div>
 
+
         <!-- Health Certificate -->
-        <div 
-          class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
+        <div
+          class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
           v-motion
           :initial="{ opacity: 0, y: 30 }"
           :visibleOnce="{ opacity: 1, y: 0, transition: { duration: 600, delay: 450 } }"
@@ -190,9 +194,10 @@
           </div>
         </div>
 
+
         <!-- Telehealth Services -->
-        <div 
-          class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
+        <div
+          class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col"
           v-motion
           :initial="{ opacity: 0, y: 30 }"
           :visibleOnce="{ opacity: 1, y: 0, transition: { duration: 600, delay: 600 } }"
@@ -216,9 +221,10 @@
     </div>
   </section>
 
+
     <!-- SDG Section -->
     <section class="py-20 bg-white">
-      <div class="container mx-auto px-8">
+      <div class="container mx-auto px-4 md:px-8">
         <!-- Updated heading style -->
         <div class="text-center mb-16">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1"
@@ -235,18 +241,18 @@
             <span class="text-blue-500"> Goals</span>
           </h2>
         </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+       
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div
             v-for="(sdg, index) in sdgs"
             :key="sdg.id"
-            class="relative shadow-md text-center h-64 overflow-hidden transition-all duration-300 ease-in-out"
+            class="relative shadow-md text-center h-80 sm:h-80 md:h-64 lg:h-64 overflow-hidden transition-all duration-300 ease-in-out"
             v-motion
             :initial="{ opacity: 0, scale: 0.9 }"
-            :visibleOnce="{ 
-              opacity: 1, 
-              scale: 1, 
-              transition: { duration: 600, delay: 100 * index } 
+            :visibleOnce="{
+              opacity: 1,
+              scale: 1,
+              transition: { duration: 600, delay: 100 * index }
             }"
             @mouseenter="sdg.isHovered = true"
             @mouseleave="sdg.isHovered = false"
@@ -276,9 +282,10 @@
       </div>
     </section>
 
+
     <!-- Contact Section -->
     <section class="py-20 bg-gray-50">
-      <div class="container mx-auto px-8">
+      <div class="container mx-auto px-4 md:px-8">
         <!-- Updated heading style -->
         <div class="text-center mb-16">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1"
@@ -295,8 +302,8 @@
             <span class="text-blue-500"> Us Today</span>
           </h2>
         </div>
-        
-        <div 
+       
+        <div
           class="bg-white rounded-2xl shadow-xl overflow-hidden"
           v-motion
           :initial="{ opacity: 0, y: 30 }"
@@ -354,6 +361,7 @@
               </form>
             </div>
 
+
             <!-- Map -->
             <div class="h-full min-h-[400px] lg:h-auto">
               <iframe
@@ -373,24 +381,28 @@
   </div>
 </template>
 
+
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { 
-  StethoscopeIcon, 
-  CalendarIcon, 
-  FileTextIcon, 
+import {
+  StethoscopeIcon,
+  CalendarIcon,
+  FileTextIcon,
   MonitorIcon,
   Target,
   Eye,
   Compass
 } from 'lucide-vue-next';
 
+
 // Background image for hero only
 const heroImage = 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?q=80&w=2000&auto=format&fit=crop';
+
 
 // Zoom effect state
 const zoomScale = ref(1);
 const heroBackground = ref(null);
+
 
 // Scroll handler for zoom effect (simplified to only handle hero)
 const handleScroll = () => {
@@ -398,6 +410,7 @@ const handleScroll = () => {
   // Hero section zoom (increases as you scroll down)
   zoomScale.value = 1 + (scrollPosition * 0.0005);
 };
+
 
 // Form data
 const form = ref({
@@ -407,6 +420,7 @@ const form = ref({
   subject: '',
   message: ''
 });
+
 
 const submitForm = () => {
   alert(`Message Sent by ${form.value.name}`);
@@ -419,6 +433,7 @@ const submitForm = () => {
     message: ''
   };
 };
+
 
 // Updated Mission, Vision, Mandate items with icons
 const mvmItems = ref([
@@ -438,6 +453,7 @@ const mvmItems = ref([
     icon: Compass
   }
 ]);
+
 
 // SDGs
 const sdgs = ref([
@@ -488,6 +504,7 @@ const sdgs = ref([
   },
 ]);
 
+
 // Lifecycle hooks
 onMounted(() => {
   window.addEventListener('scroll', handleScroll);
@@ -495,16 +512,19 @@ onMounted(() => {
   handleScroll();
 });
 
+
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll);
 });
 </script>
+
 
 <style scoped>
 /* Smooth scrolling for the page */
 html {
   scroll-behavior: smooth;
 }
+
 
 /* Animation for the bounce arrow */
 @keyframes bounce {
@@ -516,15 +536,18 @@ html {
   }
 }
 
+
 .animate-bounce {
   animation: bounce 2s infinite;
 }
+
 
 /* Transition for hover effects */
 .transition-all {
   transition-property: all;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 
 /* Custom pulse animations for potential use */
 @keyframes pulse-slow {
@@ -538,6 +561,7 @@ html {
   }
 }
 
+
 @keyframes pulse-slower {
   0%, 100% {
     transform: scale(1);
@@ -548,6 +572,7 @@ html {
     opacity: 0.7;
   }
 }
+
 
 @keyframes pulse-slowest {
   0%, 100% {
@@ -560,22 +585,27 @@ html {
   }
 }
 
+
 .animate-pulse-slow {
   animation: pulse-slow 3s infinite ease-in-out;
 }
+
 
 .animate-pulse-slower {
   animation: pulse-slower 4s infinite ease-in-out;
 }
 
+
 .animate-pulse-slowest {
   animation: pulse-slowest 5s infinite ease-in-out;
 }
+
 
 .learn-more-link {
   position: relative;
   display: inline-block;
 }
+
 
 .learn-more-link::after {
   content: '';
@@ -588,7 +618,9 @@ html {
   transition: width 0.3s ease;
 }
 
+
 .learn-more-link:hover::after {
   width: 100%;
 }
 </style>
+

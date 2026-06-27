@@ -1,14 +1,14 @@
 <!-- views/user/Telehealth.vue -->
 <template>
-  <div class="telehealth-container">
+  <div class="min-h-screen flex flex-col bg-gray-50 -mt-16 md:mt-0">
     <!-- Loading spinner during initial data load -->
     <LoadingSpinner v-if="loading" isOverlay text="Loading appointments..." />
 
     <!-- Carousel View (Optimized for small screens) -->
-    <div v-if="currentView === 'carousel' && !activeSession" class="h-full flex flex-col bg-gray-50 overflow-auto">
-      <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 flex-1 min-h-0 px-2 md:px-4 pb-4">
+    <div v-if="currentView === 'carousel' && !activeSession" class="flex flex-col flex-1 px-2 sm:px-4 md:px-6 pb-20 -pt-8 md:pt-0 md:pb-4">
+      <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 flex-1 min-h-0">
         <div class="w-full bg-white shadow-lg rounded-2xl overflow-hidden flex flex-col">
-          <div class="p-4 md:p-6 pb-8 md:pb-10 space-y-3 md:space-y-4 overflow-y-auto flex-1">
+          <div class="p-3 sm:p-4 md:p-6 pb-8 md:pb-10 space-y-3 md:space-y-4 overflow-y-auto flex-1">
             <!-- Optimized grid layout for mobile -->
             <div class="grid lg:grid-cols-2 gap-4 lg:gap-8 min-h-0 lg:min-h-[600px]">
               <!-- Left Column - Adjusted padding for mobile -->
@@ -89,11 +89,11 @@
     </div>
 
     <!-- Session List View - Optimized for mobile -->
-    <div v-else-if="currentView === 'sessions' && !activeSession" class="h-full flex flex-col bg-gray-50 overflow-auto">
-      <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 flex-1 min-h-0 px-2 md:px-4 pb-4">
+    <div v-else-if="currentView === 'sessions' && !activeSession" class="flex flex-col flex-1 px-2 sm:px-4 md:px-6 pb-20 -pt-8 md:pt-0 md:pb-4">
+      <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 flex-1 min-h-0">
         <div class="w-full bg-white shadow-lg rounded-2xl overflow-hidden flex flex-col">
           <!-- Updated to better spacing on mobile -->
-          <div class="p-4 md:p-6 pb-8 md:pb-10 space-y-3 md:space-y-4 overflow-y-auto flex-1">
+          <div class="p-3 sm:p-4 md:p-6 pb-8 md:pb-10 space-y-3 md:space-y-4 overflow-y-auto flex-1">
             <div class="flex items-center mb-4 sm:mb-6">
               <button 
                 @click="currentView = 'carousel'" 
@@ -183,13 +183,13 @@
             </div>
             
             <!-- UPDATED: Optimized grid for mobile with consistent card sizes -->
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
               <div 
                 v-for="appointment in filteredSessions" 
                 :key="appointment.id" 
                 class="bg-blue-50 border border-blue-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full"
               >
-                <div class="p-4 sm:p-5 flex flex-col flex-grow">
+                <div class="p-3 sm:p-4 md:p-5 flex flex-col flex-grow">
                   <div class="flex justify-between items-start mb-3 sm:mb-4">
                     <div class="flex-1 min-w-0">
                       <h2 class="text-base sm:text-lg font-semibold text-gray-900 mb-1 break-words">
@@ -379,10 +379,10 @@
     </div>
 
     <!-- Session Details View -->
-    <div v-else-if="currentView === 'details' && !activeSession" class="h-full flex flex-col bg-gray-50 overflow-auto">
-      <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 flex-1 min-h-0 px-2 md:px-4 pb-4">
+    <div v-else-if="currentView === 'details' && !activeSession" class="flex flex-col flex-1 px-2 sm:px-4 md:px-6 pb-20 -pt-8 md:pt-0 md:pb-4">
+      <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 flex-1 min-h-0">
         <div class="w-full bg-white shadow-lg rounded-2xl overflow-hidden flex flex-col">
-          <div class="p-4 md:p-6 pb-8 md:pb-10 space-y-3 md:space-y-4 overflow-y-auto flex-1">
+          <div class="p-3 sm:p-4 md:p-6 pb-8 md:pb-10 space-y-3 md:space-y-4 overflow-y-auto flex-1">
             <div class="flex items-center mb-4 sm:mb-6">
               <button 
                 @click="currentView = 'sessions'" 
@@ -395,7 +395,7 @@
               </h1>
             </div>
             
-            <div v-if="selectedSession" class="bg-blue-50 border border-blue-100 rounded-xl overflow-hidden p-4 sm:p-6">
+            <div v-if="selectedSession" class="bg-blue-50 border border-blue-100 rounded-xl overflow-hidden p-3 sm:p-4 md:p-6">
               <div class="flex justify-between items-start mb-4 sm:mb-6">
                 <div>
                   <h2 class="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 mb-1 sm:mb-2">
@@ -412,7 +412,7 @@
                 </span>
               </div>
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
                 <div class="space-y-3 sm:space-y-4">
                   <div class="flex items-start">
                     <CalendarIcon class="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 mr-3 sm:mr-4 mt-0.5" />
@@ -534,12 +534,12 @@
               
               <div v-if="selectedSession.notes" class="mb-6 sm:mb-8">
                 <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Notes</h3>
-                <div class="bg-white p-3 sm:p-4 rounded-lg text-sm sm:text-base text-gray-700">
+                <div class="bg-white p-3 sm:p-4 md:p-4 rounded-lg text-sm sm:text-base text-gray-700">
                   {{ selectedSession.notes }}
                 </div>
               </div>
               
-              <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4">
                 <button 
                   v-if="selectedSession.status === 'approved' && isAppointmentTime(selectedSession)" 
                   class="flex-1 inline-flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white text-sm sm:text-base rounded-full hover:bg-blue-700"
@@ -590,7 +590,7 @@
     <!-- Active Session View - Better mobile responsiveness -->
     <div v-if="activeSession" class="h-full flex flex-col bg-gray-100 overflow-hidden">
       <!-- Header with connection status indicator -->
-      <div class="bg-white border-b border-gray-200 px-3 py-2 sm:px-4 sm:py-3">
+      <div class="bg-white border-b border-gray-200 px-2 sm:px-4 md:px-6 py-2 sm:py-3">
         <!-- Mobile header (visible on small screens) -->
         <div class="sm:hidden">
           <!-- Top row: Title and End Call button -->
@@ -793,9 +793,9 @@
       
       <!-- UPDATED: Responsive layout with equal height for video and chat on mobile -->
       <div class="flex-1 overflow-y-auto">
-        <div class="flex flex-col md:flex-row gap-3 p-3 sm:gap-4 sm:p-4">
+        <div class="flex flex-col md:flex-row gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4">
           <!-- Video Container - Takes full width on mobile, 2/3 on desktop -->
-          <div class="flex-1 flex flex-col gap-3 sm:gap-4">
+          <div class="flex-1 flex flex-col gap-2 sm:gap-3 md:gap-4">
             <!-- Video Container - Tall height on small screens -->
             <div class="relative bg-gray-900 rounded-xl overflow-hidden md:aspect-video h-[450px] sm:h-[500px] md:h-auto">
               <!-- Remote Video -->
@@ -891,11 +891,11 @@
             
             <!-- Mobile Chat Panel - Same height as video on mobile -->
             <div v-if="showChatPanel && isMobileView" class="bg-white rounded-xl shadow-sm flex flex-col h-[450px] sm:h-[500px]">
-              <div class="p-2 border-b border-gray-100">
+              <div class="p-2 sm:p-3 border-b border-gray-100">
                 <h3 class="text-base font-medium text-gray-900">Chat</h3>
               </div>
               
-              <div class="flex-1 overflow-y-auto p-2 space-y-2" ref="mobileChatMessagesRef">
+              <div class="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2" ref="mobileChatMessagesRef">
                 <div 
                   v-for="message in chatMessages" 
                   :key="message.id"
@@ -926,7 +926,7 @@
                 </div>
               </div>
               
-              <div class="p-2 border-t border-gray-100">
+              <div class="p-2 sm:p-3 border-t border-gray-100">
                 <div class="flex gap-2">
                   <input 
                     v-model="newMessage" 
@@ -947,11 +947,11 @@
           
           <!-- Desktop Chat Section - UPDATED: Fixed responsive issues -->
           <div v-if="showChatPanel && !isMobileView" class="bg-white rounded-xl shadow-sm flex flex-col md:w-1/3 max-w-sm">
-            <div class="p-4 border-b border-gray-100">
+            <div class="p-3 sm:p-4 md:p-4 border-b border-gray-100">
               <h3 class="text-lg font-medium text-gray-900">Chat</h3>
             </div>
             
-            <div class="flex-1 overflow-y-auto p-4 space-y-4" ref="chatMessagesRef">
+            <div class="flex-1 overflow-y-auto p-3 sm:p-4 md:p-4 space-y-3 sm:space-y-4" ref="chatMessagesRef">
               <div 
                 v-for="message in chatMessages" 
                 :key="message.id"
@@ -983,7 +983,7 @@
             </div>
             
             <!-- UPDATED: Fixed chat input container for desktop -->
-            <div class="p-3 border-t border-gray-100">
+            <div class="p-2 sm:p-3 md:p-3 border-t border-gray-100">
               <div class="flex items-center gap-2 w-full">
                 <input 
                   v-model="newMessage" 
@@ -1003,21 +1003,21 @@
         </div>
         
         <!-- Add bottom padding to ensure content isn't hidden behind navigation -->
-        <div class="h-16 sm:h-20"></div>
+        <div class="h-16 sm:h-20 md:h-20"></div>
       </div>
     </div>
 
     <!-- Network Status Banner -->
-    <div v-if="!isOnline" class="fixed bottom-0 left-0 right-0 bg-red-100 text-red-800 px-4 py-3 flex items-center justify-center rounded-t-lg">
+    <div v-if="!isOnline" class="fixed bottom-0 left-0 right-0 bg-red-100 text-red-800 px-2 sm:px-4 md:px-6 py-3 flex items-center justify-center rounded-t-lg">
       <AlertTriangleIcon class="w-5 h-5 mr-2" />
       <span>You are currently offline. Some features may not work properly.</span>
       <button @click="attemptReconnect" class="ml-4 text-red-800 underline">Try to reconnect</button>
     </div>
 
     <!-- Incoming Call Modal -->
-    <div v-if="incomingCall && !isAcceptingCall" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div v-if="incomingCall && !isAcceptingCall" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4">
       <div class="bg-white rounded-xl max-w-md w-full overflow-hidden">
-        <div class="p-6 text-center">
+        <div class="p-4 sm:p-6 text-center">
           <!-- UPDATED: Doctor profile image in incoming call modal -->
           <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 overflow-hidden">
             <img 
@@ -1032,7 +1032,7 @@
           <h3 class="text-xl font-semibold text-gray-900 mb-2">{{ incomingCall.callerName || 'Someone' }} is calling</h3>
           <p class="text-gray-600 mb-8">{{ incomingCall.sessionTitle || 'Telehealth Session' }}</p>
           
-          <div class="flex gap-4">
+          <div class="flex gap-2 sm:gap-3 md:gap-4">
             <button 
               @click="acceptIncomingCall" 
               class="flex-1 inline-flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-full hover:bg-green-700"
@@ -1053,9 +1053,9 @@
     </div>
 
     <!-- Call Time Expired Modal -->
-    <div v-if="showCallExpiredModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div v-if="showCallExpiredModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4">
       <div class="bg-white rounded-lg max-w-md w-full overflow-hidden">
-        <div class="p-6 text-center">
+        <div class="p-4 sm:p-6 text-center">
           <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <ClockIcon class="w-10 h-10 text-red-600" />
           </div>
@@ -3195,21 +3195,5 @@ onUnmounted(() => {
   transform: translateX(0);
 }
 
-.telehealth-container {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  height: 100%;
-  padding-bottom: 1.5rem;
-}
-
-.telehealth-container > div:first-child {
-  min-height: calc(100% + 1.25rem);
-}
-
-@media (min-width: 768px) {
-  .telehealth-container {
-    min-height: calc(100% + 1.25rem);
-  }
-}
+/* Responsive spacing styles - consistent with Dashboard.vue */
 </style>

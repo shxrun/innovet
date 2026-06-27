@@ -13,8 +13,9 @@
         </div>
       </div>
 
+
       <!-- Hero Content -->
-      <div class="relative px-4 py-24 sm:px-6 lg:px-8 text-center">
+      <div class="relative container mx-auto px-4 py-24 sm:px-6 md:px-8 text-center">
         <!-- Header Section -->
         <div class="text-center mb-16">
           <h2 class="text-4xl font-bold text-white mb-4">About Us</h2>
@@ -24,9 +25,9 @@
         </div>
       </div>
     </div>
-    
+   
     <!-- Mission Vision Mandate Section that overlaps the hero -->
-    <div class="max-w-6xl mx-auto px-8 -mt-80 relative z-10">
+    <div class="container mx-auto px-4 sm:px-6 md:px-8 -mt-80 relative z-10">
       <div class="bg-white rounded-3xl p-8 shadow-lg">
         <div class="text-center mb-8">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1">Our Core Values</p>
@@ -36,16 +37,17 @@
           </h2>
         </div>
 
+
         <div class="grid md:grid-cols-3 gap-6">
-          <div v-for="(item, index) in mvmItems" 
+          <div v-for="(item, index) in mvmItems"
                :key="index"
-               class="bg-blue-50/50 border border-blue-100 rounded-lg p-6 hover:shadow-md transition-all duration-300"
+                class="bg-blue-50/50 border border-blue-100 rounded-lg p-6 hover:shadow-md transition-all duration-300 min-h-[260px] md:min-h-[280px] lg:min-h-[320px]"
                v-motion
                :initial="{ opacity: 0, scale: 0.9 }"
-               :visibleOnce="{ 
-                 opacity: 1, 
-                 scale: 1, 
-                 transition: { duration: 600, delay: 200 * index } 
+               :visibleOnce="{
+                 opacity: 1,
+                 scale: 1,
+                 transition: { duration: 600, delay: 200 * index }
                }">
             <div class="flex flex-col items-center text-center">
               <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
@@ -61,12 +63,14 @@
       </div>
     </div>
 
+
     <!-- Spacer for overlap -->
     <div class="h-32"></div>
 
+
     <!-- Stats Section with Counter Animation, Icons and Wavy Bottom -->
     <div class="relative py-20 bg-gradient-to-br from-blue-900 to-blue-500">
-      <div class="container mx-auto px-4 pb-12">
+      <div class="container mx-auto px-4 sm:px-6 md:px-8 pb-12">
         <!-- Updated heading style -->
         <div class="text-center mb-12">
           <p class="text-sm uppercase tracking-wider text-blue-300 mb-1">Our Impact</p>
@@ -75,17 +79,17 @@
             <span class="text-blue-300"> at a Glance</span>
           </h2>
         </div>
-        
+       
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div v-for="(stat, index) in stats" 
+          <div v-for="(stat, index) in stats"
                :key="index"
                class="text-center"
                ref="statElements"
                v-motion
                :initial="{ opacity: 0, y: 20 }"
-               :visibleOnce="{ 
-                 opacity: 1, 
-                 y: 0, 
+               :visibleOnce="{
+                 opacity: 1,
+                 y: 0,
                  transition: { duration: 600, delay: 100 * index }
                }">
             <div class="flex flex-col items-center">
@@ -93,13 +97,13 @@
               <div class="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
                 <component :is="stat.icon" class="w-10 h-10 text-white" />
               </div>
-              
+             
               <!-- Counter -->
               <h3 class="text-5xl font-bold mb-2 text-white flex items-center">
                 <span class="counter-value" :id="`counter-${index}`">0</span>
                 <span v-if="stat.value.includes('+')">+</span>
               </h3>
-              
+             
               <!-- Label -->
               <p class="text-white uppercase tracking-wider text-sm font-medium">
                 {{ stat.label }}
@@ -108,7 +112,7 @@
           </div>
         </div>
       </div>
-      
+     
       <!-- Wavy Bottom Shape -->
       <div class="absolute bottom-0 left-0 w-full overflow-hidden leading-[0] rotate-180">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none" class="relative block w-full h-[60px]">
@@ -117,9 +121,10 @@
       </div>
     </div>
 
+
     <!-- Team Section -->
     <div class="py-8 bg-gray-50">
-      <div class="py-20 container mx-auto px-4">
+      <div class="py-20 container mx-auto px-4 sm:px-6 md:px-8">
         <!-- Updated heading style -->
         <div class="text-center mb-12">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1">Our Professionals</p>
@@ -131,28 +136,28 @@
             Passionate professionals committed to providing the best care for your pets.
           </p>
         </div>
-        
-        <div class="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto">
-          <div v-for="(member, index) in team" 
+       
+        <div class="grid md:grid-cols-3 gap-12">
+          <div v-for="(member, index) in team"
               :key="index"
               class="relative pb-16"
               v-motion
               :initial="{ opacity: 0, y: 40 }"
-              :visibleOnce="{ 
-                opacity: 1, 
-                y: 0, 
-                transition: { duration: 600, delay: 150 * index } 
+              :visibleOnce="{
+                opacity: 1,
+                y: 0,
+                transition: { duration: 600, delay: 150 * index }
               }">
             <!-- Image Container -->
             <div class="bg-gray-100 rounded-2xl overflow-hidden">
-              <img :src="member.image" 
-                  :alt="member.name" 
-                  class="w-full h-[350px] object-cover transition-transform duration-700 hover:scale-110"/>
+              <img :src="member.image"
+                  :alt="member.name"
+                  class="w-full h-[340px] md:h-[400px] lg:h-[460px] object-cover transition-transform duration-700 hover:scale-110"/>
             </div>
-            
+           
             <!-- Overlapping Card -->
-            <div class="absolute -bottom-4 left-4 right-4 bg-white rounded-2xl shadow-md p-6 text-center transform transition-all duration-500 hover:-translate-y-2 hover:shadow-xl">
-              <h3 class="text-lg font-semibold text-gray-900">{{ member.name }}</h3>
+            <div class="absolute -bottom-4 left-4 right-4 bg-white rounded-2xl shadow-md p-4 text-center transform transition-all duration-500 hover:-translate-y-2 hover:shadow-xl min-h-[100px]">
+              <h3 class="text-base font-semibold text-gray-900">{{ member.name }}</h3>
               <p class="text-gray-600 text-sm">{{ member.role }}</p>
             </div>
           </div>
@@ -160,18 +165,19 @@
       </div>
     </div>
 
+
     <!-- Agencies Section -->
-    <div class="py-16 relative overflow-hidden transition-all duration-700" 
-         :style="{ 
+    <div class="py-16 relative overflow-hidden transition-all duration-700"
+         :style="{
            backgroundImage: activeAgencyBg ? `url(${activeAgencyBg})` : 'none',
            backgroundSize: 'cover',
            backgroundPosition: 'center'
          }">
       <!-- Overlay for better text readability when background image is active -->
-      <div class="absolute inset-0 bg-white" 
+      <div class="absolute inset-0 bg-white"
            :class="{ 'bg-opacity-90': activeAgencyBg, 'bg-opacity-100': !activeAgencyBg }"></div>
-      
-      <div class="container mx-auto px-4 relative z-10">
+     
+      <div class="container mx-auto px-4 sm:px-6 md:px-8 relative z-10">
         <!-- Updated heading style -->
         <div class="text-center mb-12">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1">Our Partners</p>
@@ -183,31 +189,32 @@
             We collaborate with leading organization to ensure the best veterinary services.
           </p>
         </div>
-        
-        <div class="flex flex-wrap justify-center items-center gap-12 max-w-6xl mx-auto p-8">
-          <div v-for="(agency, index) in agencies" 
+       
+        <div class="flex flex-wrap justify-center items-center gap-12 mx-auto py-8">
+          <div v-for="(agency, index) in agencies"
               :key="index"
               class="flex items-center justify-center w-48 h-48 rounded-lg p-4 transition-all duration-500 hover:scale-110"
               @mouseenter="setActiveAgency(agency)"
               @mouseleave="clearActiveAgency"
               v-motion
               :initial="{ opacity: 0, rotateY: 90 }"
-              :visibleOnce="{ 
-                opacity: 1, 
-                rotateY: 0, 
-                transition: { duration: 800, delay: 200 * index } 
+              :visibleOnce="{
+                opacity: 1,
+                rotateY: 0,
+                transition: { duration: 800, delay: 200 * index }
               }">
-            <img :src="agency.logo" 
-                :alt="agency.name" 
+            <img :src="agency.logo"
+                :alt="agency.name"
                 class="max-w-full max-h-full object-contain transition-transform duration-300 hover:scale-125"/>
           </div>
         </div>
       </div>
     </div>
 
+
     <!-- System Development Team Section -->
     <div class="py-16 bg-gray-50">
-      <div class="container mx-auto px-4">
+      <div class="container mx-auto px-4 sm:px-6 md:px-8">
         <!-- Updated heading style -->
         <div class="text-center mb-12">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1">Our Creators</p>
@@ -220,48 +227,50 @@
           </p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto">
-          <div v-for="(dev, index) in developers" 
+
+        <div class="grid md:grid-cols-3 gap-12">
+          <div v-for="(dev, index) in developers"
               :key="index"
               class="relative group"
               v-motion
               :initial="{ opacity: 0, y: 60 }"
-              :visibleOnce="{ 
-                opacity: 1, 
-                y: 0, 
-                transition: { 
-                  duration: 800, 
+              :visibleOnce="{
+                opacity: 1,
+                y: 0,
+                transition: {
+                  duration: 800,
                   delay: 200 * index,
                   type: 'spring',
                   stiffness: 50
-                } 
+                }
               }">
             <!-- Card Container -->
-            <div class="bg-white rounded-2xl shadow-lg p-6 pt-16 transition-all duration-500 hover:-translate-y-2 hover:shadow-xl">
+            <div class="bg-white rounded-2xl shadow-lg p-7 pt-20 transition-all duration-500 hover:-translate-y-2 hover:shadow-xl min-h-[300px]">
               <!-- Circular Image with Arc -->
-              <div class="relative w-32 h-32 mx-auto -mt-24 mb-6">
+              <div class="relative w-36 h-36 mx-auto -mt-28 mb-7">
                 <div class="absolute inset-0 rounded-full border-[3px] border-transparent">
                   <!-- Teal Arc -->
                   <div class="absolute inset-0 rounded-full border-[9px] border-blue-500"
                       style="clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%);">
                   </div>
                 </div>
-                <img :src="dev.image" 
-                    :alt="dev.name" 
+                <img :src="dev.image"
+                    :alt="dev.name"
                     class="w-full h-full object-cover rounded-full border-4 border-white shadow-lg"/>
               </div>
+
 
               <!-- Content -->
               <div class="text-center space-y-3">
                 <div class="space-y-1">
-                  <h3 class="text-xl font-semibold text-[#2B3674]">
+                  <h3 class="text-[1.35rem] font-semibold text-[#2B3674]">
                     {{ dev.name }}
                   </h3>
                   <p class="text-gray-500 text-sm">
                     {{ dev.role }}
                   </p>
                 </div>
-                
+               
                 <!-- Social Media Icons -->
                 <div class="flex justify-center items-center space-x-4 pt-2">
                   <a href="#" class="text-gray-400 hover:text-blue-500 transition-colors">
@@ -286,15 +295,16 @@
   </div>
 </template>
 
+
 <script setup>
 import { ref, onMounted } from 'vue'
-import { 
-  LinkedinIcon, 
-  TwitterIcon, 
-  GithubIcon, 
-  MailIcon, 
-  Target, 
-  Eye, 
+import {
+  LinkedinIcon,
+  TwitterIcon,
+  GithubIcon,
+  MailIcon,
+  Target,
+  Eye,
   Compass,
   Calendar,
   Users,
@@ -302,68 +312,73 @@ import {
   PawPrint
 } from 'lucide-vue-next'
 
+
 // Stats data with icons
 const stats = ref([
-  { 
+  {
     value: '152+',
     label: 'Appointments Today',
     icon: Calendar
   },
-  { 
+  {
     value: '2,845',
     label: 'Active Users',
     icon: Users
   },
-  { 
+  {
     value: '15,832',
     label: 'Total Visits',
     icon: Activity
   },
-  { 
+  {
     value: '8,423',
     label: 'Registered Pets',
     icon: PawPrint
   }
 ]);
 
+
 const statElements = ref([]);
 let observer;
+
 
 // Parse numeric value from stat string (removing any '+' or other characters)
 const parseStatValue = (value) => {
   return parseInt(value.replace(/\D/g, ''));
 };
 
+
 // Function to animate counter (similar to ProjectMoses style)
 const animateCounter = (element, targetValue) => {
   let startTime;
   const duration = 2500; // 2.5 seconds for the animation
   const startValue = 0;
-  
+ 
   // Format number with commas
   const formatNumber = (num) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
-  
+ 
   const step = (timestamp) => {
     if (!startTime) startTime = timestamp;
     const progress = Math.min((timestamp - startTime) / duration, 1);
-    
+   
     // Use easeOutExpo for a more dramatic effect like ProjectMoses
     const easeOutExpo = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-    
+   
     const currentValue = Math.floor(startValue + (targetValue - startValue) * easeOutExpo);
     element.textContent = formatNumber(currentValue);
-    
+   
     if (progress < 1) {
       requestAnimationFrame(step);
     } else {
       element.textContent = formatNumber(targetValue);
     }
   };
-  
+ 
   requestAnimationFrame(step);
 };
+
 
 // Setup Intersection Observer to trigger animations when stats are visible
 onMounted(() => {
@@ -371,7 +386,7 @@ onMounted(() => {
   setTimeout(() => {
     // Get all counter elements
     const counterElements = document.querySelectorAll('.counter-value');
-    
+   
     // Create intersection observer
     observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -387,13 +402,14 @@ onMounted(() => {
         }
       });
     }, { threshold: 0.1 });
-    
+   
     // Observe each counter element
     counterElements.forEach(element => {
       observer.observe(element);
     });
   }, 500);
 });
+
 
 const mvmItems = ref([
   {
@@ -413,6 +429,7 @@ const mvmItems = ref([
   }
 ]);
 
+
 const team = ref([
   {
     name: 'Grimaldo C. Catapang, DVM',
@@ -430,6 +447,7 @@ const team = ref([
     image: new URL('@/assets/media/images/landing/doc3.jpg', import.meta.url).href,
   }
 ]);
+
 
 // Updated agencies with background images
 const agencies = ref([
@@ -450,37 +468,42 @@ const agencies = ref([
   }
 ]);
 
+
 const developers = ref([
   {
     name: 'Sharon Caballero',
     role: 'Machine Learning Engineer',
-    image: new URL('@/assets/media/images/landing/doc1.jpg', import.meta.url).href,
+    image: new URL('@/assets/media/images/landing/sharon.jpg', import.meta.url).href,
   },
   {
     name: 'John Darwin Lambon',
     role: 'Main Programmer',
-    image: new URL('@/assets/media/images/landing/doc2.jpg', import.meta.url).href,
+    image: new URL('@/assets/media/images/landing/darwin.jpg', import.meta.url).href,
   },
   {
     name: 'Lhen Dimailig',
     role: 'UI/UX Designer',
-    image: new URL('@/assets/media/images/landing/doc2.jpg', import.meta.url).href,
+    image: new URL('@/assets/media/images/landing/lhen.jpg', import.meta.url).href,
   }
 ]);
 
+
 // Active agency background state
 const activeAgencyBg = ref(null);
+
 
 // Set active agency background
 const setActiveAgency = (agency) => {
   activeAgencyBg.value = agency.background;
 };
 
+
 // Clear active agency background
 const clearActiveAgency = () => {
   activeAgencyBg.value = null;
 };
 </script>
+
 
 <style scoped>
 /* Custom pulse animations with different speeds */
@@ -495,6 +518,7 @@ const clearActiveAgency = () => {
   }
 }
 
+
 @keyframes pulse-slower {
   0%, 100% {
     transform: scale(1);
@@ -505,6 +529,7 @@ const clearActiveAgency = () => {
     opacity: 0.7;
   }
 }
+
 
 @keyframes pulse-slowest {
   0%, 100% {
@@ -517,17 +542,21 @@ const clearActiveAgency = () => {
   }
 }
 
+
 .animate-pulse-slow {
   animation: pulse-slow 3s infinite ease-in-out;
 }
+
 
 .animate-pulse-slower {
   animation: pulse-slower 4s infinite ease-in-out;
 }
 
+
 .animate-pulse-slowest {
   animation: pulse-slowest 5s infinite ease-in-out;
 }
+
 
 /* Counter styles similar to ProjectMoses */
 .counter-value {
@@ -536,6 +565,7 @@ const clearActiveAgency = () => {
   font-variant-numeric: tabular-nums;
   transition: all 0.2s ease;
 }
+
 
 /* Add any additional custom animations here */
 @keyframes fadeInUp {
@@ -549,6 +579,7 @@ const clearActiveAgency = () => {
   }
 }
 
+
 @keyframes fadeInLeft {
   from {
     opacity: 0;
@@ -559,6 +590,7 @@ const clearActiveAgency = () => {
     transform: translateX(0);
   }
 }
+
 
 @keyframes fadeInRight {
   from {
@@ -571,6 +603,7 @@ const clearActiveAgency = () => {
   }
 }
 
+
 @keyframes zoomIn {
   from {
     opacity: 0;
@@ -581,6 +614,7 @@ const clearActiveAgency = () => {
     transform: scale(1);
   }
 }
+
 
 @keyframes rotateIn {
   from {
@@ -593,3 +627,7 @@ const clearActiveAgency = () => {
   }
 }
 </style>
+
+
+
+

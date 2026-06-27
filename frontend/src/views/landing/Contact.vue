@@ -13,8 +13,9 @@
         </div>
       </div>
 
+
       <!-- Hero Content -->
-      <div class="relative px-4 py-24 sm:px-6 lg:px-8 text-center">
+      <div class="relative container mx-auto px-4 py-24 sm:px-6 md:px-8 text-center">
   <!-- Header Section -->
   <div class="text-center mb-16">
     <h2 class="text-4xl font-bold text-white mb-4">Contact Us</h2>
@@ -22,12 +23,13 @@
   Contact us for inquiries, appointments, or assistance.
 </p>
 
+
   </div>
 </div>
     </div>
-    
+   
     <!-- FAQ Section that overlaps the hero -->
-    <div class="max-w-6xl mx-auto px-8 -mt-80 relative z-10">
+    <div class="container mx-auto px-4 sm:px-6 md:px-8 -mt-80 relative z-10">
       <div class="bg-white rounded-3xl p-8 shadow-lg">
         <div class="text-center mb-8">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1">FAQ</p>
@@ -35,11 +37,12 @@
             <span class="text-blue-800">Frequently Asked</span>
             <span class="text-blue-500"> Questions</span>
           </h2>
-        
+       
         </div>
 
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div v-for="(faq, index) in faqs" :key="index" 
+          <div v-for="(faq, index) in faqs" :key="index"
             class="bg-blue-50/50 border border-blue-100 rounded-lg p-5 hover:shadow-md transition-shadow"
           >
             <div class="flex gap-4">
@@ -56,10 +59,11 @@
           </div>
         </div>
 
+
         <div class="text-center mt-8">
           <div class="inline-block bg-blue-50 px-6 py-3 rounded-full">
             <p class="text-blue-800 text-sm">
-              Didn't find the answer you are looking for? 
+              Didn't find the answer you are looking for?
               <a href="tel:+1234567890" class="font-medium text-blue-500 hover:underline">Give us a call</a>
             </p>
           </div>
@@ -67,17 +71,19 @@
       </div>
     </div>
 
+
     <!-- Spacer for overlap -->
     <div class="h-26"></div>
 
+
     <!-- Contact Section with same width as FAQ -->
-    <div class="max-w-6xl mx-auto px-8 py-16">
+    <div class="container mx-auto px-4 sm:px-6 md:px-8 py-16">
       <div class="rounded-3xl shadow-lg overflow-hidden">
         <div class="grid grid-cols-1 lg:grid-cols-2">
           <!-- Get in Touch Section with blue-50 background -->
           <div class="bg-blue-50 p-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-6">Get In Touch</h2>
-            
+           
             <!-- Contact Details -->
             <div class="space-y-6">
               <!-- Location -->
@@ -92,6 +98,7 @@
                 </div>
               </div>
 
+
               <!-- Email -->
               <div class="flex items-center space-x-4">
                 <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -104,6 +111,7 @@
                 </div>
               </div>
 
+
               <!-- Phone -->
               <div class="flex items-center space-x-4">
                 <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -115,6 +123,7 @@
                   <p class="text-gray-600">(123) 456-7891</p>
                 </div>
               </div>
+
 
               <!-- Social Media -->
               <div class="mt-8">
@@ -133,6 +142,7 @@
               </div>
             </div>
           </div>
+
 
           <!-- Contact Form with white background -->
           <div class="bg-white p-8">
@@ -193,6 +203,7 @@
         </div>
       </div>
 
+
       <!-- Map Section with same width -->
       <div class="mt-8">
         <iframe
@@ -209,9 +220,11 @@
   </div>
 </template>
 
+
 <script setup>
 import { ref } from 'vue';
 import { Mail, Phone, MapPin, Clock10Icon, HelpCircle } from 'lucide-vue-next';
+
 
 const form = ref({
   name: '',
@@ -221,6 +234,7 @@ const form = ref({
   subject: '',
   message: ''
 });
+
 
 const submitForm = () => {
   console.log('Form submitted:', form.value);
@@ -233,6 +247,7 @@ const submitForm = () => {
     message: ''
   };
 };
+
 
 // FAQ data
 const faqs = ref([
@@ -255,6 +270,7 @@ const faqs = ref([
 ]);
 </script>
 
+
 <style>
 /* Custom pulse animations with different speeds */
 @keyframes pulse-slow {
@@ -268,6 +284,7 @@ const faqs = ref([
   }
 }
 
+
 @keyframes pulse-slower {
   0%, 100% {
     transform: scale(1);
@@ -278,6 +295,7 @@ const faqs = ref([
     opacity: 0.7;
   }
 }
+
 
 @keyframes pulse-slowest {
   0%, 100% {
@@ -290,15 +308,19 @@ const faqs = ref([
   }
 }
 
+
 .animate-pulse-slow {
   animation: pulse-slow 3s infinite ease-in-out;
 }
+
 
 .animate-pulse-slower {
   animation: pulse-slower 4s infinite ease-in-out;
 }
 
+
 .animate-pulse-slowest {
   animation: pulse-slowest 5s infinite ease-in-out;
 }
 </style>
+

@@ -80,8 +80,8 @@
                 </a>
                 <span v-else>{{ contact.value }}</span>
               </td>
-              <td class="py-4 px-6 text-sm text-gray-900 hidden md:table-cell">{{ contact.label }}</td>
-              <td class="py-4 px-6 hidden sm:table-cell">
+              <td class="py-4 px-6 text-sm text-gray-900">{{ contact.label }}</td>
+              <td class="py-4 px-6">
                 <span :class="[
                   'px-2 py-1 text-xs font-medium rounded-full',
                   contact.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -89,11 +89,11 @@
                   {{ contact.isActive ? 'Active' : 'Inactive' }}
                 </span>
               </td>
-              <td class="py-4 px-6 text-sm text-gray-900 hidden lg:table-cell">{{ contact.notes || 'N/A' }}</td>
-              <td class="py-4 px-6 text-sm text-gray-600 hidden md:table-cell">
+              <td class="py-4 px-6 text-sm text-gray-900">{{ contact.notes || 'N/A' }}</td>
+              <td class="py-4 px-6 text-sm text-gray-600">
                 {{ formatTimestamp(contact.createdAt) }}
               </td>
-              <td class="py-4 px-6 text-sm text-gray-600 hidden md:table-cell">
+              <td class="py-4 px-6 text-sm text-gray-600">
                 {{ formatTimestamp(contact.updatedAt) }}
               </td>
               <td class="py-4 px-6 text-sm">
@@ -346,7 +346,7 @@ const contactTypes = [
   'Twitter',
   'YouTube',
   'LinkedIn',
-  'WhatsApp',
+
   'Telegram',
   'Viber',
   'Other'
@@ -486,7 +486,7 @@ const getContactIcon = (type) => {
     case 'Twitter': return Twitter
     case 'YouTube': return Youtube
     case 'LinkedIn': return Linkedin
-    case 'WhatsApp': return MessageSquare
+
     case 'Telegram': return MessageSquare
     case 'Viber': return MessageSquare
     default: return MessageSquare
@@ -524,7 +524,7 @@ const getContactValueLabel = (type) => {
     case 'Twitter': return 'Twitter Handle'
     case 'YouTube': return 'YouTube Channel'
     case 'LinkedIn': return 'LinkedIn Profile'
-    case 'WhatsApp': return 'WhatsApp Number'
+
     case 'Telegram': return 'Telegram Username'
     case 'Viber': return 'Viber Number'
     default: return 'Value'
@@ -543,7 +543,7 @@ const getContactPlaceholder = (type) => {
     case 'Twitter': return '@yourusername or https://twitter.com/yourusername'
     case 'YouTube': return 'channelname or https://youtube.com/c/channelname'
     case 'LinkedIn': return 'username or https://linkedin.com/in/username'
-    case 'WhatsApp': return '+63 917 123 4567'
+
     case 'Telegram': return '@username'
     case 'Viber': return '+63 917 123 4567'
     default: return 'Enter value'

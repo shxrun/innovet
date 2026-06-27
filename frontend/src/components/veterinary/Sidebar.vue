@@ -6,7 +6,7 @@
     :class="{ 
       'w-64': isOpen, 
       'w-16': !isOpen && !isSmallScreen,
-      'w-0': !isOpen && isSmallScreen,
+      'w-0 left-[-100%] opacity-0 pointer-events-none': !isOpen && isSmallScreen,
       'left-4': !isSmallScreen,
       'mx-4': isSmallScreen
     }"
@@ -14,14 +14,14 @@
     <template v-if="isOpen || !isSmallScreen">
       <!-- Logo and Toggle Button (Shows at top when expanded) -->
       <div v-if="isOpen" class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-        <h1 class="text-xl font-semibold text-blue-600">ProVet</h1>
+        <h1 class="text-xl font-semibold text-blue-600">InnoVet</h1>
         <button @click="handleToggle" 
                 class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200">
           <PanelLeftClose class="w-5 h-5" />
         </button>
       </div>
       <div v-else class="px-4 py-4 border-b border-gray-200">
-        <PawPrint class="w-6 h-6 text-blue-600 mx-auto" />
+        <img src="@/assets/media/images/logo/innovetlogo.png" alt="InnoVet Logo" class="w-8 h-8 mx-auto" />
       </div>
   
       <!-- Navigation -->
@@ -40,7 +40,11 @@
               ]"
             >
               <div class="flex items-center">
-                <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+                <component 
+                  :is="item.icon" 
+                  v-bind="item.iconProps || {}"
+                  class="w-5 h-5 flex-shrink-0" 
+                />
                 <span v-if="isOpen" class="ml-3">{{ item.label }}</span>
               </div>
               <ChevronDown 
@@ -94,11 +98,15 @@
              ]"
              @click="handleItemClick(item)"
           >
-            <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+            <component 
+              :is="item.icon" 
+              v-bind="item.iconProps || {}"
+              class="w-5 h-5 flex-shrink-0" 
+            />
             <span v-if="isOpen" class="ml-3">{{ item.label }}</span>
             <!-- Tooltip for collapsed state -->
             <div v-if="!isOpen" 
-                 class="fixed left-16 ml-2 px-3 py-2 bg-white border border-gray-200 text-gray-800 text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity whitespace-nowrap">
+                 class="fixed left-16 ml-2 px-3 py-2 bg-white border border-gray-200 text-gray-800 text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity whitespace-nowrap z-50">
               {{ item.label }}
             </div>
           </router-link>
@@ -119,6 +127,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { Icon } from "@iconify/vue";
 import {
   LayoutDashboard,
   Users,
@@ -133,7 +142,8 @@ import {
   Settings,
   Check,
   ChevronDown,
-  BookOpen
+  BookOpen,
+  List
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -178,13 +188,13 @@ const handleMouseLeave = () => {
 
 const getDropdownStyle = (label) => {
   if (!sidebarRef.value || !menuItemRefs.value[label]) return {};
-
+  
   const sidebarRect = sidebarRef.value.getBoundingClientRect();
   const itemRect = menuItemRefs.value[label].getBoundingClientRect();
-
+  
   return {
-    top: `${itemRect.top - sidebarRect.top}px`,
-    left: `${sidebarRect.width}px`,
+    top: `${itemRect.top}px`,
+    left: `${sidebarRect.width + 8}px`,
   };
 };
 
@@ -205,7 +215,12 @@ const handleItemClick = (item) => {
 };
 
 const navItems = [
-  { href: '/vet/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { 
+    href: '/vet/dashboard', 
+    icon: Icon, 
+    label: 'Dashboard', 
+    iconProps: { icon: "mage:dashboard-bar-notification", width: 20, height: 20 } 
+  },
   { href: '/vet/vetclientpets', icon: Users, label: 'Clients & Pets' },
   { 
     icon: Calendar,
@@ -215,6 +230,7 @@ const navItems = [
       { href: '/vet/appointments/vetcalendar', icon: Calendar, label: 'Calendar' },
     ]
   },
+  { href: '/vet/queue', icon: List, label: 'Queue' },
   { href: '/vet/vetfeedback', icon: MessageCircle, label: 'Feedback' },
   { href: '/vet/vettelehealth', icon: Video, label: 'Telehealth' },
   { href: '/vet/medicalrecords', icon: ClipboardList, label: 'Medical Records' },
@@ -231,11 +247,16 @@ const isActiveParent = (item) => {
 };
 
 onMounted(() => {
-  sidebarRef.value = document.querySelector('aside');
+  document.addEventListener('click', (event) => {
+    if (sidebarRef.value && !sidebarRef.value.contains(event.target)) {
+      openSubmenu.value = null;
+    }
+  });
 });
 
 onUnmounted(() => {
   clearTimeout(hoverTimeout.value);
+  document.removeEventListener('click', () => {});
 });
 
 watch(() => props.isOpen, (newValue) => {

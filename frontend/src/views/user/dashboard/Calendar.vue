@@ -2,19 +2,23 @@
 <template>
 <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-blue/50">
 <!-- Calendar Header with gradient background -->
-<div class="bg-gradient-to-r from-blue-600 to-blue-800 p-4 text-white">
+<div class="bg-gradient-to-r from-blue-600 to-blue-800 p-3 sm:p-4 text-white">
 <div class="flex justify-between items-center">
-  <h2 class="text-xl font-bold flex items-center">
-    <CalendarIcon class="w-5 h-5 mr-2" />
-    {{ monthNames[currentMonth] }} {{ currentYear }}
+  <h2 class="text-sm sm:text-lg md:text-xl font-bold flex items-center">
+    <CalendarIcon class="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+    <span class="hidden sm:inline">{{ monthNames[currentMonth] }} {{ currentYear }}</span>
+    <span class="sm:hidden">{{ monthNames[currentMonth].substring(0, 3) }} {{ currentYear }}</span>
   </h2>
-  <div class="flex space-x-1">
-    <button @click="prevMonth" class="bg-white/20 hover:bg-white/30 p-1.5 rounded-full transition-colors">
-      <ChevronLeftIcon class="h-4 w-4" />
+      <div class="flex space-x-1 items-center">
+    <button @click="prevMonth" class="bg-white/20 hover:bg-white/30 p-1.5 sm:p-2 rounded-full transition-colors flex items-center justify-center">
+      <ChevronLeftIcon class="h-3 w-3 sm:h-4 sm:w-4" />
     </button>
-    <button @click="nextMonth" class="bg-white/20 hover:bg-white/30 p-1.5 rounded-full transition-colors">
-      <ChevronRightIcon class="h-4 w-4" />
+    <button @click="nextMonth" class="bg-white/20 hover:bg-white/30 p-1.5 sm:p-2 rounded-full transition-colors flex items-center justify-center">
+      <ChevronRightIcon class="h-3 w-3 sm:h-4 sm:w-4" />
     </button>
+        <button @click="openLargeCalendar" class="ml-1 sm:ml-2 p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors group flex items-center justify-center">
+          <MaximizeIcon class="h-3 w-3 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform duration-200" />
+        </button>
   </div>
 </div>
 </div>
@@ -41,7 +45,7 @@
     {{ date }}
     <!-- Appointment indicator dots -->
     <div v-if="hasAppointment(date)" class="absolute -bottom-1 flex space-x-0.5 justify-center">
-      <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+      <div class="w-1.5 h-1.5 rounded-full bg-blue-500 appointment-indicator"></div>
     </div>
   </div>
 </div>
@@ -104,17 +108,83 @@
     <p class="text-xs text-gray-500">No appointments scheduled</p>
   </div>
 </div>
+  <!-- Large calendar modal -->
+  <Transition
+    enter-active-class="transition-all duration-300 ease-out"
+    enter-from-class="opacity-0 scale-95"
+    enter-to-class="opacity-100 scale-100"
+    leave-active-class="transition-all duration-200 ease-in"
+    leave-from-class="opacity-100 scale-100"
+    leave-to-class="opacity-0 scale-95"
+  >
+    <div v-if="showLarge" class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" @click="closeLargeCalendar">
+      <!-- Backdrop with animation -->
+      <div class="absolute inset-0 bg-black/40 transition-opacity duration-300"></div>
+      
+      <!-- Modal content with enhanced animations and responsive sizing -->
+      <div 
+        class="relative bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden transform transition-all duration-300 ease-out" 
+        @click.stop
+        :class="showLarge ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4'"
+      >
+        <!-- Header with responsive design -->
+        <div class="p-3 sm:p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between bg-gradient-to-r from-slate-50 to-white gap-3 sm:gap-0">
+          <div class="text-sm sm:text-base md:text-lg font-semibold text-gray-800">
+            <span class="hidden sm:inline">{{ largeMonthLabel }}</span>
+            <span class="sm:hidden">{{ format(largeCurrentDate, 'MMM yyyy') }}</span>
+          </div>
+          <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
+            <button @click="largePrevMonth" class="p-1.5 sm:p-2 border rounded-lg sm:rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center">
+              <ChevronLeftIcon class="w-3 h-3 sm:w-4 sm:h-4" />
+            </button>
+            <button @click="largeToday" class="px-2 py-1.5 sm:px-3 sm:py-1.5 text-xs sm:text-sm border rounded-lg sm:rounded-xl hover:bg-slate-50 transition-colors">Today</button>
+            <button @click="largeNextMonth" class="p-1.5 sm:p-2 border rounded-lg sm:rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center">
+              <ChevronRightIcon class="w-3 h-3 sm:w-4 sm:h-4" />
+            </button>
+            <button @click="closeLargeCalendar" class="ml-1 sm:ml-2 px-2 py-1.5 sm:px-3 sm:py-1.5 text-xs sm:text-sm border rounded-lg sm:rounded-xl hover:bg-slate-50 transition-colors">Close</button>
+          </div>
+        </div>
+        
+        <!-- Days of week with responsive text -->
+        <div class="grid grid-cols-7 border-b bg-slate-50 text-[10px] sm:text-xs text-slate-600">
+          <div class="p-1 sm:p-2 text-center font-medium" v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d">{{ d }}</div>
+        </div>
+        
+        <!-- Calendar grid with responsive sizing -->
+        <div class="grid grid-cols-7 calendar-grid overflow-auto max-h-[calc(95vh-120px)] sm:max-h-[calc(90vh-120px)]">
+          <div 
+            v-for="(cell, idx) in buildLargeCalendarDays" 
+            :key="idx" 
+            class="min-h-[60px] sm:min-h-[80px] md:min-h-[110px] border-r border-b last:border-r-0 p-1 sm:p-2 transition-all duration-200 hover:bg-gray-50 calendar-cell" 
+            :class="cell.isCurrentMonth ? 'bg-white' : 'bg-slate-50'"
+            :style="{ animationDelay: `${(idx % 7) * 50}ms` }"
+          >
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] sm:text-xs font-medium" :class="cell.isCurrentMonth ? 'text-slate-700' : 'text-slate-400'">{{ cell.date.getDate() }}</span>
+            </div>
+            <div class="space-y-0.5 sm:space-y-1">
+              <div v-for="(appt, i) in getAppointmentsForLargeDay(cell.date)" :key="i" class="text-[9px] sm:text-xs rounded-md p-0.5 sm:p-1 bg-blue-50 border border-blue-100">
+                <div class="font-medium text-slate-800 truncate">{{ getAllServicesTitle(appt) }}</div>
+                <div class="text-slate-600 truncate">{{ appt.time }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </div>
 </div>
 </template>
 
 <script setup>
-import { ref, computed, defineExpose, onMounted, watch } from 'vue';
+import { ref, computed, defineExpose, onMounted, onUnmounted, watch } from 'vue';
 import { 
 Clock as ClockIcon, 
 Calendar as CalendarIcon, 
 ChevronLeft as ChevronLeftIcon,
-ChevronRight as ChevronRightIcon
+ChevronRight as ChevronRightIcon,
+Maximize2 as MaximizeIcon
 } from 'lucide-vue-next';
 import { useAppointmentStore } from '@/stores/modules/appointmentStore';
 import { useAuthStore } from '@/stores/modules/authStore';
@@ -356,9 +426,9 @@ await serviceCategoryStore.fetchServices();
 categories.value = serviceCategoryStore.categories;
 services.value = serviceCategoryStore.services;
 
-console.log('Fetched services and categories:', services.value.length, categories.value.length);
+        
 } catch (error) {
-console.error('Error fetching services and categories:', error);
+      // Error fetching services and categories
 }
 };
 
@@ -448,9 +518,9 @@ return {
 };
 });
 
-console.log(`Loaded ${approvedAppointments.value.length} approved appointments`);
+        
 } catch (error) {
-console.error('Error fetching approved appointments:', error);
+      // Error fetching approved appointments
 } finally {
 isLoading.value = false;
 }
@@ -546,6 +616,12 @@ watch(() => appointmentStore.appointments, async () => {
 await fetchApprovedAppointments();
 }, { deep: true });
 
+// Cleanup on component unmount
+onUnmounted(() => {
+  // Restore body scroll when component is unmounted
+  document.body.style.overflow = '';
+});
+
 // Expose methods and data that might be needed by the parent component
 defineExpose({
 currentMonth,
@@ -563,4 +639,193 @@ getSelectedDateAppointments,
 getDateClass,
 fetchApprovedAppointments
 });
+
+// ==============================
+// Large calendar (Vet design-inspired)
+// ==============================
+const showLarge = ref(false);
+const largeCurrentDate = ref(new Date());
+const largeMonthLabel = computed(() => format(largeCurrentDate.value, 'MMMM yyyy'));
+
+const buildLargeCalendarDays = computed(() => {
+  const year = largeCurrentDate.value.getFullYear();
+  const month = largeCurrentDate.value.getMonth();
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const firstDow = first.getDay(); // 0=Sun
+  const days = [];
+  // leading days from prev month
+  for (let i = 0; i < firstDow; i++) {
+    const d = new Date(year, month, -i);
+    days.unshift({ date: d, isCurrentMonth: false });
+  }
+  // current month days
+  for (let d = 1; d <= last.getDate(); d++) {
+    days.push({ date: new Date(year, month, d), isCurrentMonth: true });
+  }
+  // trailing to reach 42 cells
+  while (days.length < 42) {
+    const lastDate = days[days.length - 1].date;
+    const next = new Date(lastDate);
+    next.setDate(lastDate.getDate() + 1);
+    days.push({ date: next, isCurrentMonth: false });
+  }
+  return days;
+});
+
+const getAppointmentsForLargeDay = (d) => {
+  return approvedAppointments.value.filter(appt => {
+    return appt.day === d.getDate() && appt.month === d.getMonth() && appt.year === d.getFullYear();
+  });
+};
+
+const largePrevMonth = () => {
+  const d = new Date(largeCurrentDate.value);
+  d.setMonth(d.getMonth() - 1);
+  largeCurrentDate.value = d;
+};
+const largeNextMonth = () => {
+  const d = new Date(largeCurrentDate.value);
+  d.setMonth(d.getMonth() + 1);
+  largeCurrentDate.value = d;
+};
+const largeToday = () => { largeCurrentDate.value = new Date(); };
+
+const openLargeCalendar = () => { 
+  showLarge.value = true;
+  // Prevent body scroll when modal is open
+  document.body.style.overflow = 'hidden';
+};
+
+const closeLargeCalendar = () => { 
+  showLarge.value = false;
+  // Restore body scroll when modal is closed
+  document.body.style.overflow = '';
+};
 </script>
+
+<style scoped>
+/* Calendar cell animations */
+.calendar-cell-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.calendar-cell-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.calendar-cell-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Modal backdrop animation */
+.modal-backdrop-enter-active,
+.modal-backdrop-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-backdrop-enter-from,
+.modal-backdrop-leave-to {
+  opacity: 0;
+}
+
+/* Modal content animation */
+.modal-content-enter-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-content-enter-from {
+  opacity: 0;
+  transform: scale(0.95) translateY(20px);
+}
+
+.modal-content-enter-to {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* Hover effects for calendar cells */
+.calendar-cell {
+  transition: all 0.2s ease;
+}
+
+.calendar-cell:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive hover effects - reduce on mobile */
+@media (hover: hover) {
+  .calendar-cell:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition: all 0.2s ease;
+}
+
+/* Enhanced button hover effects */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (hover: hover) {
+  button:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* Calendar grid animation */
+.calendar-grid {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Appointment indicator animation */
+.appointment-indicator {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Responsive modal improvements */
+@media (max-width: 640px) {
+  .calendar-grid {
+    max-height: calc(95vh - 100px) !important;
+  }
+}
+
+/* Touch-friendly improvements */
+@media (max-width: 768px) {
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .calendar-cell {
+    min-height: 44px;
+  }
+}
+</style>

@@ -48,12 +48,18 @@ const routeNameMap = {
   'feedback':'Feedback',
   'usertelehealth':'Telehealth',
   'vetclientpets':'Clients & Pets',
-  'vetappointmentapproval':'Appointment Approval',
+  'vetappointmentapproval':'Appointments',
   'vetcalendar':'Calendar',
   'vetfeedback':'Feedback',
   'vettelehealth':'Telehealth',
   'medicalrecords':'Medical Records',
   'vethealthriskassessment':'Health Risk Assessment',
+  'veteducationalresources':'Educational Resources',
+  'queue':'Queue',
+  'vetprofile':'Profile',
+  'office-hours': 'Office Hours',
+  'office-contact': 'Office Contact',
+  'office-settings': 'Office Settings',
 };
 
 const currentPage = computed(() => {

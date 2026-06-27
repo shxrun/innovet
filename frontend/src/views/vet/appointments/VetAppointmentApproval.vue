@@ -1,10 +1,11 @@
-<!-- views/vet/appointments/ApprovedAppointments.vue -->
 <template>
 <div class="bg-white p-6 rounded-2xl">
 <!-- Header Section -->
 <div class="mb-6">
   <h2 class="text-2xl font-medium text-gray-900">Appointment Approval</h2>
   <p class="text-gray-500 mt-1">Manage and approve veterinary appointments.</p>
+  
+
 </div>
 
 <!-- Search and Actions -->
@@ -25,7 +26,7 @@
       >
         <FilterIcon class="w-5 h-5 text-gray-500" />
       </button>
-      <!-- Filter Dropdown - Status Only (added completed) -->
+      <!-- Filter Dropdown - Status Only (works together with category filter) -->
       <div v-if="showFilters" class="absolute top-full mt-2 right-0 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10">
         <div class="px-4 py-2 text-sm font-medium text-gray-700">Filter by Status:</div>
         <button 
@@ -36,18 +37,44 @@
           All Statuses
         </button>
         <button 
-          v-for="status in ['pending', 'approved', 'completed', 'cancelled', 'ended']" 
+          v-for="status in ['pending', 'approved', 'completed', 'cancelled', 'ended', 'expired', 'reschedule_requested']" 
           :key="status"
           @click="toggleStatusFilter(status)"
           class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 capitalize"
           :class="{ 'text-[#0066FF]': filters.status === status }"
         >
-          {{ status }}
+          {{ status === 'reschedule_requested' ? 'Reschedule Requested' : status }}
         </button>
       </div>
     </div>
   </div>
   <div class="flex justify-end gap-2 w-full sm:w-auto">
+    <!-- Bulk Actions -->
+    <div v-if="selectedAppointments.size > 0" class="flex items-center gap-2">
+      <span class="text-sm text-gray-600">{{ selectedAppointments.size }} selected</span>
+      <button 
+        @click="showBulkActionModal = true; bulkActionType = 'approve'"
+        class="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-full hover:bg-green-600 text-xs"
+      >
+        <CheckIcon class="w-3 h-3" />
+        Approve All
+      </button>
+      <button 
+        @click="showBulkActionModal = true; bulkActionType = 'reject'"
+        class="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 text-xs"
+      >
+        <XIcon class="w-3 h-3" />
+        Reject All
+      </button>
+      <button 
+        @click="clearSelection"
+        class="flex items-center gap-1 px-3 py-1.5 bg-gray-500 text-white rounded-full hover:bg-gray-600 text-xs"
+      >
+        <XIcon class="w-3 h-3" />
+        Clear
+      </button>
+    </div>
+    
     <button 
       @click="exportToCSV"
       class="flex items-center justify-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-green-500 text-white rounded-full hover:bg-green-600 text-xs sm:text-sm w-auto"
@@ -55,259 +82,608 @@
       <DownloadIcon class="w-3 h-3 sm:w-4 sm:h-4" />
       Export CSV
     </button>
+
+    <!-- Refresh Button -->
+    <button
+      @click="handleRefresh"
+      :disabled="isLoading || initialLoading"
+      class="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+      title="Refresh"
+    >
+      <RefreshCwIcon class="w-4 h-4 text-gray-500" />
+    </button>
+    
+
   </div>
 </div>
 
-<!-- Active Filters Display - Status Only -->
-<div v-if="filters.status" class="mb-4 flex flex-wrap gap-2">
-  <div class="text-sm text-gray-500 py-1">Active filters:</div>
+<!-- Status Category Bar -->
+<div class="mb-4">
+  <div class="flex flex-wrap gap-2">
+    <button
+      v-for="cat in statusCategories"
+      :key="cat.key === '' ? 'all' : cat.key"
+      @click="toggleStatusFilter(cat.key === '' ? 'All' : cat.key)"
+      class="px-3 py-1.5 rounded-full border text-xs sm:text-sm transition-colors"
+      :class="[
+        (filters.status === cat.key || (cat.key === '' && filters.status === ''))
+          ? 'bg-blue-600 text-white border-blue-600'
+          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+      ]"
+      :title="`Show ${cat.label} appointments`"
+    >
+      <span>{{ cat.label }}</span>
+      <span class="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px]"
+            :class="(filters.status === cat.key || (cat.key === '' && filters.status === '')) ? 'bg-white/20' : 'bg-gray-100 text-gray-700'">
+        {{ cat.count }}
+      </span>
+    </button>
+  </div>
+</div>
+
+<!-- Active Filters Display -->
+<div v-if="filters.status || categoryFilter !== 'all'" class="mb-4 flex flex-wrap gap-2">
+  <div class="text-sm text-gray-500 py-1">Active filters (combined):</div>
   
-  <div class="inline-flex items-center gap-1 px-3 py-1 bg-[#EBF5FF] text-[#0066FF] rounded-full text-xs capitalize">
+  <!-- Status Filter -->
+  <div v-if="filters.status" class="inline-flex items-center gap-1 px-3 py-1 bg-[#EBF5FF] text-[#0066FF] rounded-full text-xs capitalize">
     <span>{{ filters.status }}</span>
-    <button @click="clearStatusFilter" class="text-[#0066FF] hover:text-blue-700">
+    <button @click="clearStatusFilterOnly" class="text-[#0066FF] hover:text-blue-700">
+      <XIcon class="w-3 h-3" />
+    </button>
+  </div>
+  
+  <!-- Category Filter -->
+  <div v-if="categoryFilter !== 'all'" class="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+    <span>{{ getCategoryName(categoryFilter) }}</span>
+    <button @click="clearCategoryFilterOnly" class="text-green-700 hover:text-blue-800">
+      <XIcon class="w-3 h-3" />
+    </button>
+  </div>
+  
+  <!-- Clear All Filters Button -->
+  <div v-if="filters.status && categoryFilter !== 'all'" class="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs hover:bg-gray-200">
+    <button @click="clearAllFilters" class="flex items-center gap-1">
+      <span>Clear All</span>
       <XIcon class="w-3 h-3" />
     </button>
   </div>
 </div>
 
-<!-- Table -->
-<div v-if="!initialLoading && !showApprovalForm" class="border border-gray-200 rounded-lg overflow-x-auto">
-  <table class="min-w-full divide-y divide-gray-200">
-    <thead class="bg-gray-50">
-      <tr>
-        <th v-for="header in headers" :key="header.key" 
-            @click="sortBy(header.key)"
-            class="px-6 py-4 text-left text-sm font-medium text-gray-500 cursor-pointer whitespace-nowrap">
-          <div class="flex items-center">
-            {{ header.label }}
-            <div class="flex flex-col ml-1">
-              <span :class="['text-[10px] leading-none', { 'text-gray-800': sortKey === header.key && sortOrder === 'asc' }]" >▲</span>
-              <span :class="['text-[10px] leading-none', { 'text-gray-800': sortKey === header.key && sortOrder === 'desc' }]">▼</span>
-            </div>
-          </div>
-        </th>
-        <th class="px-6 py-4 text-right text-sm font-medium text-gray-500 whitespace-nowrap">
-          Actions
-        </th>
-      </tr>
-    </thead>
-    <tbody class="bg-white divide-y divide-gray-200">
-      <tr v-for="appointment in paginatedAppointments" :key="appointment.id" 
-          class="hover:bg-gray-50 transition-colors duration-150">
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex items-center">
-            <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mr-3">
+<!-- Category Filter - Works together with status filter -->
+<div class="mb-4 flex items-center gap-3">
+  <label class="text-sm font-medium text-gray-700">Filter by Category:</label>
+      <select 
+      v-model="categoryFilter" 
+      @change="setCategoryFilter"
+      class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+    >
+      <option value="all">All Categories</option>
+      <option 
+        v-for="category in availableCategories" 
+        :key="category.id" 
+        :value="category.id"
+      >
+        {{ category.name }}
+      </option>
+    </select>
+  <button
+    v-if="categoryFilter !== 'all'"
+    @click="clearCategoryFilterOnly"
+    class="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+  >
+    Clear
+  </button>
+</div>
+
+
+
+<!-- Appointment Cards -->
+<div v-if="!initialLoading && !showApprovalForm" class="space-y-4">
+  <!-- Bulk Selection Header -->
+  <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+    <div class="flex items-center gap-3">
+      <input 
+        type="checkbox" 
+        :checked="isAllSelected"
+        @change="toggleAllSelection"
+        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+      />
+      <span class="text-sm font-medium text-gray-700">Select All Appointments</span>
+    </div>
+    
+    <!-- Sort Dropdown -->
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-gray-500">Sort by:</span>
+      <select 
+        v-model="sortKey" 
+        @change="sortOrder = 'asc'"
+        class="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
+      >
+        <option value="date">Date</option>
+        <option value="ownerName">Owner</option>
+        <option value="status">Status</option>
+        <option value="createdAt">Created</option>
+      </select>
+      <button 
+        @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
+        class="p-1 hover:bg-gray-200 rounded"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Appointment Cards -->
+  <div class="grid gap-4">
+          <div v-for="appointment in paginatedAppointments" :key="appointment.id" 
+           :id="`appt-${appointment.id}`"
+           :data-appointment-id="appointment.id"
+           class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+      
+      <!-- Card Header -->
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <input 
+            type="checkbox" 
+            :checked="selectedAppointments.has(appointment.id)"
+            @change="toggleAppointmentSelection(appointment.id)"
+            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <div class="flex items-center gap-2">
+            <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
               <img 
-                v-if="appointment.ownerAvatar && appointment.ownerAvatar !== '/placeholder.svg?height=40&width=40'"
-                :src="appointment.ownerAvatar" 
-                class="w-full h-full object-cover"
-                alt=""
+                v-if="appointment.ownerPhotoURL"
+                :src="appointment.ownerPhotoURL" 
+                :alt="appointment.ownerName"
+                class="w-full h-full object-cover" 
                 @error="onImageError"
               />
-              <img 
-                v-else
-                :src="defaultPhotoURL" 
-                class="w-full h-full object-cover"
-                alt=""
-              />
+              <UserIcon v-else class="w-5 h-5 text-gray-400" />
             </div>
             <div>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-900">{{ appointment.ownerName || 'Unknown Owner' }}</span>
-                <span class="text-xs text-gray-500">(Owner)</span>
-              </div>
-              <div v-if="appointment.ownerEmail" class="text-xs text-gray-500 mt-0.5">
-                {{ appointment.ownerEmail }}
-              </div>
+              <div class="font-medium text-gray-900">{{ appointment.ownerName || 'Unknown Owner' }}</div>
+              <div class="text-sm text-gray-500">{{ appointment.ownerEmail || 'No email' }}</div>
             </div>
           </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <span class="text-sm text-gray-900">{{ appointment.contactInformation || 'No contact info' }}</span>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <!-- No pets case - Just text, no icon -->
-          <div v-if="!hasPet(appointment)">
-            <span class="text-sm text-gray-500">No Pet</span>
+        </div>
+        
+        <!-- Status Badge -->
+        <div class="flex items-center gap-2">
+          <span 
+            class="px-2 py-1 text-xs font-medium rounded-full"
+            :class="{
+              'bg-yellow-100 text-yellow-800': appointment.status === 'pending',
+              'bg-green-100 text-green-800': appointment.status === 'approved',
+              'bg-red-100 text-red-800': appointment.status === 'rejected',
+              'bg-blue-100 text-blue-800': appointment.status === 'completed',
+              'bg-gray-100 text-gray-800': appointment.status === 'cancelled',
+              'bg-slate-100 text-slate-800': appointment.status === 'ended',
+              'bg-orange-100 text-orange-800': appointment.rescheduleRequest?.status === 'reschedule_requested',
+              'bg-red-50 text-red-700 border border-red-200': isExpired(appointment)
+            }"
+          >
+            {{ isExpired(appointment) ? 'Expired' : 
+               (appointment.rescheduleRequest?.status === 'reschedule_requested' ? 'Reschedule Requested' : formatStatus(appointment.status)) }}
+          </span>
+          <span v-if="isExpired(appointment)" class="text-xs text-red-500">Past scheduled time</span>
+        </div>
+      </div>
+      
+      <!-- Card Content -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <!-- Appointment Details -->
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <CalendarIcon class="w-4 h-4 text-gray-400" />
+            <span class="text-sm text-gray-600">{{ formatDate(appointment.date) }}</span>
           </div>
+          <div class="flex items-center gap-2">
+            <ClockIcon class="w-4 h-4 text-gray-400" />
+            <span class="text-sm text-gray-600">{{ appointment.time || 'No time set' }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <PawPrintIcon class="w-4 h-4 text-gray-400" />
+            <span class="text-sm text-gray-600">
+              {{ getPetDisplayName(appointment) }}
+              <span v-if="appointment.petSpecies" class="text-gray-400">({{ appointment.petSpecies }})</span>
+            </span>
+          </div>
+        </div>
+        
+        <!-- Services -->
+        <div>
+          <div class="text-sm font-medium text-gray-700 mb-2">Services</div>
+          <div class="flex flex-wrap gap-1">
+            <div 
+              v-for="(serviceId, index) in appointment.services" 
+              :key="index"
+              class="flex flex-col items-start"
+            >
+              <span class="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-md mb-1">
+                {{ getServiceDisplayName(serviceId) }}
+            </span>
+              <span 
+                v-if="getServiceCategory(serviceId)"
+                class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded text-center"
+                :title="getServiceCategory(serviceId)?.description"
+              >
+                {{ getServiceCategory(serviceId)?.name }}
+              </span>
+
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Card Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div class="text-xs text-gray-500">
+          Created: {{ formatDateTime(appointment.createdAt) }}
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2">
+                  <!-- Request Reschedule button - for pending, approved, expired, or reschedule_requested appointments -->
+          <button 
+          v-if="appointment.status === 'pending' || appointment.status === 'approved' || (appointment.rescheduleRequest && appointment.rescheduleRequest.status === 'reschedule_requested') || isExpired(appointment)"
+            @click="openRescheduleRequestPanel(appointment)"
+            class="p-1.5 bg-orange-100 hover:bg-orange-200 text-orange-600 rounded-full transition-colors duration-200"
+            :title="isExpired(appointment) ? 'Request Reschedule for Expired Appointment' : 'Request Reschedule'"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 0 002 2z"></path>
+            </svg>
+          </button>
           
-          <!-- Single pet case (for backward compatibility) -->
-          <div v-else-if="appointment.petName && !Array.isArray(appointment.petIds)" class="flex items-center">
-            <div class="flex-shrink-0 h-10 w-10 mr-3 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden">
-              <img 
-                v-if="appointment.petPhotoURL"
-                :src="appointment.petPhotoURL" 
-                :alt="appointment.petName"
-                class="h-10 w-10 rounded-full object-cover" 
-                @error="onPetImageError"
-              />
-              <img 
-                v-else
-                :src="defaultPetPhotoURL" 
-                class="h-7 w-7" 
-                alt="Pet placeholder"
-              />
-            </div>
-            <div class="text-sm font-medium text-gray-900">
-              {{ appointment.petName }}
-              <span v-if="appointment.petSpecies" class="text-gray-600">({{ appointment.petSpecies }})</span>
-            </div>
-          </div>
+          <!-- Toggle Details Button -->
+          <button 
+            @click="toggleAppointmentDetails(appointment.id)"
+            class="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-colors duration-200"
+            :title="expandedAppointment === appointment.id ? 'Hide Details' : 'View Details'"
+          >
+            <svg class="w-4 h-4 transition-transform duration-200" 
+                 :class="{ 'rotate-180': expandedAppointment === appointment.id }"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
           
-          <!-- Multiple pets case - Group by species with overlapping photos -->
-          <div v-else class="flex flex-col gap-4">
-            <!-- Display each species group -->
-            <div v-for="(group, groupIndex) in getPetGroups(appointment)" :key="groupIndex" class="flex items-center">
-              <!-- Overlapping profile pictures - First pet is at the back -->
-              <div class="flex mr-3 relative" style="width: 70px; height: 40px;">
-                <!-- Render in reverse order so first pet is at the back -->
-                <div 
-                  v-for="(petIndex, photoIndex) in [...group.indices].slice(0, 3).reverse()" 
-                  :key="photoIndex"
-                  class="absolute h-10 w-10 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden"
-                  :style="{ 
-                    left: `${photoIndex * 15}px`, 
-                    zIndex: photoIndex + 1
-                  }"
-                >
-                  <img 
-                    v-if="appointment.petPhotos && appointment.petPhotos[petIndex]"
-                    :src="appointment.petPhotos[petIndex]" 
-                    :alt="appointment.petNames[petIndex]"
-                    class="h-10 w-10 rounded-full object-cover" 
-                    @error="onPetImageError"
-                  />
-                  <img 
-                    v-else
-                    :src="defaultPetPhotoURL" 
-                    class="h-7 w-7" 
-                    alt="Pet placeholder"
-                  />
+
+          
+          <!-- Status Action Buttons -->
+          <div class="flex items-center gap-1">
+            <button 
+              v-if="appointment.status === 'pending'"
+              @click="openActionConfirm('approve', appointment.id)"
+              class="p-1.5 bg-green-100 hover:bg-green-200 text-green-600 rounded-full transition-colors duration-200"
+              title="Approve"
+            >
+              <CheckIcon class="w-4 h-4" />
+            </button>
+            <button 
+              v-if="appointment.status === 'pending'"
+              @click="openActionConfirm('reject', appointment.id)"
+              class="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors duration-200"
+              title="Reject"
+            >
+              <XIcon class="w-4 h-4" />
+            </button>
+            <!-- Mark as Completed Button for approved appointments -->
+            <button 
+              v-if="appointment.status === 'approved'"
+              @click="openActionConfirm('complete', appointment.id)"
+              class="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 rounded-full transition-colors duration-200"
+              title="Mark as Completed"
+            >
+              <CheckCircleIcon class="w-4 h-4" />
+            </button>
+            <button 
+              v-if="appointment.status === 'approved'"
+              @click="openCancelModal(appointment)"
+              class="p-1.5 bg-orange-100 hover:bg-orange-200 text-orange-600 rounded-full transition-colors duration-200"
+              title="Cancel Appointment"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Expanded Details Section -->
+      <div v-if="expandedAppointment === appointment.id" class="mt-4 pt-4 border-t border-gray-200">
+        <!-- First Row - Appointment Details -->
+        <div class="mb-6">
+          <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <h4 class="text-base font-medium text-gray-900">Appointment Details</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Left Column - Owner Information -->
+              <div class="space-y-3">
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Owner Name</span>
+                  <span class="text-sm font-medium text-gray-900">{{ appointment.ownerName || 'Not provided' }}</span>
                 </div>
-                
-                <!-- Show +X more if there are more than 3 pets of the same species -->
-                <div 
-                  v-if="group.indices.length > 3" 
-                  class="absolute h-10 w-10 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600"
-                  :style="{ left: '30px', zIndex: 4 }"
-                >
-                  +{{ group.indices.length - 3 }}
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Email</span>
+                  <span class="text-sm font-medium text-gray-900">{{ appointment.ownerEmail || 'Not provided' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Phone</span>
+                  <span class="text-sm font-medium text-gray-900">{{ appointment.contactInformation || 'Not provided' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                  <span class="text-sm text-gray-500">Gender</span>
+                  <span class="text-sm font-medium text-gray-900 capitalize">{{ appointment.gender || 'Not provided' }}</span>
                 </div>
               </div>
               
-              <!-- Pet names with commas and species at the end -->
-              <div class="text-sm font-medium text-gray-900">
-                <!-- Show only first 2 names + count if more than 2 -->
-                <span v-if="group.indices.length <= 2">
-                  {{ group.indices.map(idx => appointment.petNames[idx]).join(', ') }}
+              <!-- Right Column - Appointment Information -->
+              <div class="space-y-3">
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Date</span>
+                  <span class="text-sm font-medium text-gray-900">{{ formatDate(appointment.date) }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Time</span>
+                  <span class="text-sm font-medium text-gray-900">{{ appointment.time || 'Not set' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Status</span>
+                  <span class="text-sm font-medium text-gray-900">
+                    <span 
+                      class="px-2 py-1 text-xs font-medium rounded-full"
+                      :class="{
+                        'bg-yellow-100 text-yellow-800': appointment.status === 'pending',
+                        'bg-green-100 text-green-800': appointment.status === 'approved',
+                        'bg-red-100 text-red-800': appointment.status === 'rejected',
+                        'bg-blue-100 text-blue-800': appointment.status === 'completed',
+                        'bg-gray-100 text-gray-800': appointment.status === 'cancelled',
+                        'bg-slate-100 text-slate-800': appointment.status === 'ended',
+                        'bg-orange-100 text-orange-800': isExpired(appointment)
+                      }"
+                    >
+                      {{ isExpired(appointment) ? 'Expired' : 
+                         (appointment.rescheduleRequest?.status === 'reschedule_requested' ? 'Reschedule Requested' : formatStatus(appointment.status)) }}
+                    </span>
+                  </span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                  <span class="text-sm text-gray-500">Created</span>
+                  <span class="text-sm font-medium text-gray-900">{{ formatDateTime(appointment.createdAt) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Services -->
+            <div class="mt-4 pt-3 border-t border-gray-100">
+              <div class="text-sm text-gray-500 mb-2">Services</div>
+              <div class="flex flex-wrap gap-2">
+                <div 
+                  v-for="(serviceId, index) in appointment.services" 
+                  :key="index"
+                  class="flex flex-col items-start"
+                >
+                  <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded font-medium mb-1">
+                    {{ getServiceDisplayName(serviceId) }}
+                  </span>
+                  <span 
+                    v-if="getServiceCategory(serviceId)"
+                    class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded text-center"
+                    :title="getServiceCategory(serviceId)?.description"
+                  >
+                    {{ getServiceCategory(serviceId)?.name }}
                 </span>
-                <span v-else>
-                  {{ group.indices.slice(0, 2).map(idx => appointment.petNames[idx]).join(', ') }} 
-                  +{{ group.indices.length - 2 }}
-                </span>
-                <span class="text-gray-600">({{ group.species }})</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Notes -->
+            <div v-if="appointment.notes" class="mt-3 pt-3 border-t border-gray-100">
+              <div class="text-sm text-gray-500 mb-2">Notes</div>
+              <div class="text-sm text-gray-700 bg-gray-50 p-2 rounded text-xs">
+                {{ appointment.notes }}
               </div>
             </div>
           </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <span class="text-sm text-gray-900">{{ formatDate(appointment.date) }}</span>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <span class="text-sm text-gray-900">{{ appointment.time }}</span>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex flex-wrap gap-1">
-            <span 
-              v-for="(service, index) in appointment.serviceNames" 
-              :key="index"
-              class="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full"
-            >
-              {{ service }}
-            </span>
-          </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div>
-            <span :class="getStatusClass(appointment.status)">
-              {{ formatStatus(appointment.status) }}
-            </span>
-            <!-- Show cancellation reason if status is cancelled -->
-            <div v-if="appointment.status === 'cancelled' && appointment.cancellationReason" 
-                 class="mt-1 text-xs text-gray-500 max-w-[200px] truncate" 
-                 :title="appointment.cancellationReason">
-              Reason: {{ appointment.cancellationReason }}
-            </div>
-            <!-- Show who cancelled it -->
-            <div v-if="appointment.status === 'cancelled' && appointment.cancelledBy" 
-                 class="mt-1 text-xs text-gray-500">
-              By: {{ appointment.cancelledBy === 'user' ? 'Owner' : 'Vet' }}
-            </div>
-          </div>
-        </td>
-        <!-- Created Date Column -->
-        <td class="px-6 py-4 whitespace-nowrap">
-          <span class="text-sm text-gray-900">{{ formatDateTime(appointment.createdAt) }}</span>
-        </td>
-        <!-- Updated Date Column - Now showing date and time -->
-        <td class="px-6 py-4 whitespace-nowrap">
-          <span class="text-sm text-gray-900">{{ formatDateTime(appointment.updatedAt) }}</span>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap text-right">
-          <div class="flex justify-end gap-2">
-            <!-- Processing state - show cancel processing button -->
-            <div v-if="appointment.status === 'processing'" class="flex gap-2">
-              <button 
-                @click="cancelProcessing(appointment)"
-                class="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-colors duration-200"
-                title="Cancel Processing"
-              >
-                <XCircleIcon class="w-4 h-4" />
-              </button>
-              <span class="text-xs text-blue-600 flex items-center">
-                Processing...
-              </span>
+        </div>
+        
+        <!-- Second Row - Pets Card -->
+        <div class="mb-6" v-if="hasPet(appointment)">
+          <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+              <h4 class="text-base font-medium text-gray-900">Pet</h4>
             </div>
             
-            <!-- Normal state - show approve/cancel buttons -->
-            <template v-else>
-              <!-- Approve button - only for pending appointments -->
-              <button 
-                v-if="appointment.status === 'pending'"
-                @click="startApprovalProcess(appointment)"
-                class="p-1.5 bg-green-100 hover:bg-green-200 text-green-600 rounded-full transition-colors duration-200"
-                title="Approve Appointment"
-              >
-                <CheckIcon class="w-4 h-4" />
-              </button>
-              <!-- Cancel button - for both pending and approved appointments -->
-              <button 
-                v-if="appointment.status === 'pending' || appointment.status === 'approved'"
-                @click="setProcessingStatus(appointment, 'cancel')"
-                class="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors duration-200"
-                title="Cancel Appointment"
-              >
-                <XIcon class="w-4 h-4" />
-              </button>
-            </template>
-          </div>
-        </td>
-      </tr>
-      
-      <!-- Empty state -->
-      <tr v-if="paginatedAppointments.length === 0">
-        <td colspan="11" class="py-8 text-center">
-          <div class="flex flex-col items-center justify-center">
-            <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <CalendarIcon class="w-8 h-8 text-gray-300" />
+            <!-- Pet Card -->
+            <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+              <div class="w-16 h-16 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                <img 
+                  v-if="appointment.petPhotoURL"
+                  :src="appointment.petPhotoURL" 
+                  :alt="getPetDisplayName(appointment)"
+                  class="w-full h-full object-cover" 
+                  @error="onPetImageError"
+                />
+                <img 
+                  v-else
+                  :src="defaultPetPhotoURL" 
+                  :alt="getPetDisplayName(appointment)"
+                  class="w-full h-full object-cover" 
+                />
+              </div>
+              <div class="flex-1">
+                <div class="text-lg font-medium text-gray-900">{{ getPetDisplayName(appointment) }}</div>
+                <div class="text-sm text-gray-500">{{ appointment.petSpecies || 'Unknown Species' }}</div>
+                <div class="text-sm text-gray-500">{{ appointment.petBreed || 'Unknown Breed' }}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-sm text-gray-500">Age</div>
+                <div class="text-sm font-medium text-gray-900">{{ formatPetAge(appointment) || 'Unknown' }}</div>
+              </div>
             </div>
-            <p class="text-gray-500 font-medium">No appointments found</p>
-            <p class="text-gray-400 text-sm mt-1">Try adjusting your search or filters</p>
           </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+        </div>
+        
+        <!-- Third Row - Pet Information with Timeline -->
+        <div class="mb-6" v-if="hasPet(appointment)">
+          <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-2 h-2 bg-indigo-500 rounded-full"></div>
+              <h4 class="text-base font-medium text-gray-900">Pet Information & History</h4>
+            </div>
+            
+            <!-- Pet Information -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- Left Column - Pet Details -->
+              <div class="space-y-3">
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Breed</span>
+                  <span class="text-sm font-medium text-gray-900">{{ appointment.petBreed || 'Not provided' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Gender</span>
+                  <span class="text-sm font-medium text-gray-900 capitalize">{{ formatGender(appointment.petGender) || 'Not provided' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span class="text-sm text-gray-500">Age</span>
+                  <span class="text-sm font-medium text-gray-900">{{ formatPetAge(appointment) || 'Not provided' }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                  <span class="text-sm text-gray-500">Weight</span>
+                  <span class="text-sm font-medium text-gray-900">{{ appointment.petWeight ? `${appointment.petWeight} kg` : 'Not provided' }}</span>
+                </div>
+              </div>
+              
+              <!-- Right Column - Timeline -->
+              <div class="relative">
+                <!-- Timeline Header -->
+                <div class="mb-4">
+                  <h4 class="text-sm font-medium text-gray-700 mb-2">Pet Medical History (Completed Appointments)</h4>
+                  <p class="text-xs text-gray-500">Showing only completed appointments for this pet</p>
+                </div>
+                
+                <!-- Timeline Items -->
+                <div class="space-y-4">
+                  <div 
+                    v-for="(historyItem, index) in getPetHistory(appointment.petId || appointment.petNames?.[0] || appointment.petName)" 
+                    :key="index"
+                    class="relative pl-8"
+                  >
+                    <!-- Timeline Dot with Connector -->
+                    <div class="absolute left-0 flex flex-col items-center">
+                      <!-- Main Dot -->
+                      <div class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex items-center justify-center z-10"
+                         :class="{
+                           'bg-green-500': historyItem.status === 'completed',
+                           'bg-yellow-500': historyItem.status === 'pending',
+                           'bg-blue-500': historyItem.status === 'approved',
+                           'bg-red-500': historyItem.status === 'rejected'
+                         }">
+                      <div class="w-1 h-1 rounded-full bg-white"></div>
+                      </div>
+                      
+                      <!-- Connector Line (only if not the last item) -->
+                      <div v-if="index < getPetHistory(appointment.petId || appointment.petNames?.[0] || appointment.petName).length - 1" 
+                           class="w-0.5 h-8 bg-gray-200 mt-2"></div>
+                    </div>
+                    
+                    <!-- Timeline Content -->
+                    <div class="bg-gray-50 rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
+                      <div class="flex items-start justify-between mb-2">
+                        <div>
+                          <h5 class="font-medium text-gray-900 text-sm">
+                            <div class="flex flex-wrap gap-1">
+                              <div 
+                                v-for="(service, index) in historyItem.serviceNames" 
+                                :key="index"
+                                class="flex flex-col items-start"
+                              >
+                                <span class="text-sm">{{ getServiceDisplayName(service) }}</span>
+                                <span 
+                                  v-if="getServiceCategory(service)"
+                                  class="px-1 py-0.5 bg-gray-100 text-gray-600 text-xs rounded text-center"
+                                  :title="getServiceCategory(service)?.description"
+                                >
+                                  {{ getServiceCategory(service)?.name }}
+                                </span>
+                              </div>
+                            </div>
+                          </h5>
+                          <p class="text-xs text-gray-500">{{ formatDate(historyItem.date) }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="px-2 py-1 text-xs font-medium rounded-full" 
+                                :class="{
+                                  'bg-green-100 text-green-700': historyItem.status === 'completed',
+                                  'bg-yellow-100 text-yellow-700': historyItem.status === 'pending',
+                                  'bg-blue-100 text-blue-700': historyItem.status === 'approved',
+                                  'bg-red-100 text-red-700': historyItem.status === 'rejected'
+                                }">
+                            {{ historyItem.status }}
+                          </span>
+                          
+                          <!-- View Summary Button for Completed Appointments -->
+                          <button 
+                            v-if="historyItem.status === 'completed' && historyItem.completionData"
+                            @click="viewAppointmentSummary(historyItem)"
+                            class="p-1 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-colors"
+                            title="View Completion Summary"
+                          >
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <!-- Completion Summary Preview -->
+                      <div v-if="historyItem.status === 'completed' && historyItem.completionData" class="mt-2 pt-2 border-t border-gray-100">
+                        <div class="text-xs text-gray-500 mb-1">Completion Summary Available</div>
+                        <div class="bg-blue-50 rounded p-2 text-xs">
+                          <div class="font-medium text-blue-800 mb-1">Services:</div>
+                          <div class="text-blue-700">
+                            {{ historyItem.completionData.services?.length || 0 }} service(s) completed
+                          </div>
+                          <div class="font-medium text-blue-800 mt-1 mb-1">Health Assessment:</div>
+                          <div class="text-blue-700">
+                            {{ historyItem.completionData.pets?.length || 0 }} pet(s) assessed
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Empty State -->
+                  <div v-if="!getPetHistory(appointment.petId || appointment.petNames?.[0] || appointment.petName)?.length" 
+                       class="text-center py-6 text-gray-500">
+                    <PawPrintIcon class="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                    <p class="text-sm">No completed appointments found for this pet.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Empty State -->
+    <div v-if="paginatedAppointments.length === 0" class="text-center py-12">
+      <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+        <CalendarIcon class="w-8 h-8 text-gray-300" />
+      </div>
+      <p class="text-gray-500 font-medium">No appointments found</p>
+      <p class="text-gray-400 text-sm mt-1">Try adjusting your search or filters</p>
+    </div>
+  </div>
 </div>
 
 <!-- Multi-step Approval Form -->
@@ -382,85 +758,81 @@
         <p class="text-sm text-gray-600 mb-4">{{ currentApprovalStep.description }}</p>
     
         <!-- Owner Information Step -->
-        <div v-if="currentApprovalStep.id === 'owner'" class="space-y-4">
-          <div class="bg-white rounded-lg p-4 border border-gray-200">
-            <h3 class="text-lg font-medium text-gray-800 mb-3">Owner Information</h3>
-            
+        <div v-if="currentApprovalStep.id === 'owner'" class="space-y-6">
             <!-- Personal Information Section -->
-            <div class="mb-6">
-              <div class="flex items-center mb-2">
-                <div class="bg-blue-100 rounded-full p-1.5 mr-2">
-                  <UserIcon class="w-4 h-4 text-blue-500" />
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="bg-blue-100 rounded-full p-2">
+                <UserIcon class="w-5 h-5 text-blue-600" />
                 </div>
-                <h4 class="text-sm font-medium text-gray-700">Personal Information</h4>
+              <h4 class="text-lg font-medium text-gray-900">Personal Information</h4>
               </div>
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- First Name & Last Name -->
                 <div>
-                  <div class="text-xs text-gray-500 mb-1">First Name</div>
-                  <div class="text-sm font-medium text-gray-900">{{ selectedAppointment.firstName || (selectedAppointment.ownerName ? selectedAppointment.ownerName.split(' ')[0] : 'Not provided') }}</div>
+                <div class="text-sm text-gray-500 mb-2">First Name</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.firstName || (selectedAppointment.ownerName ? selectedAppointment.ownerName.split(' ')[0] : 'Not provided') }}</div>
                 </div>
                 <div>
-                  <div class="text-xs text-gray-500 mb-1">Last Name</div>
-                  <div class="text-sm font-medium text-gray-900">{{ selectedAppointment.lastName || (selectedAppointment.ownerName ? selectedAppointment.ownerName.split(' ').slice(1).join(' ') : 'Not provided') }}</div>
+                <div class="text-sm text-gray-500 mb-2">Last Name</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.lastName || (selectedAppointment.ownerName ? selectedAppointment.ownerName.split(' ').slice(1).join(' ') : 'Not provided') }}</div>
                 </div>
                 
                 <!-- Date of Birth & Age -->
                 <div>
-                  <div class="text-xs text-gray-500 mb-1">Date of Birth</div>
-                  <div class="text-sm font-medium text-gray-900">{{ selectedAppointment.dateOfBirth ? formatDate(selectedAppointment.dateOfBirth) : 'Not provided' }}</div>
+                <div class="text-sm text-gray-500 mb-2">Date of Birth</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.dateOfBirth ? formatDate(selectedAppointment.dateOfBirth) : 'Not provided' }}</div>
                 </div>
                 <div>
-                  <div class="text-xs text-gray-500 mb-1">Age</div>
-                  <div class="text-sm font-medium text-gray-900">{{ selectedAppointment.age || calculateAge(selectedAppointment.dateOfBirth) || 'Not provided' }}</div>
+                <div class="text-sm text-gray-500 mb-2">Age</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.age || calculateAge(selectedAppointment.dateOfBirth) || 'Not provided' }}</div>
                 </div>
                 
                 <!-- Gender -->
                 <div>
-                  <div class="text-xs text-gray-500 mb-1">Gender</div>
-                  <div class="text-sm font-medium text-gray-900 capitalize">{{ selectedAppointment.gender || 'Not provided' }}</div>
+                <div class="text-sm text-gray-500 mb-2">Gender</div>
+                <div class="text-base font-medium text-gray-900 capitalize">{{ selectedAppointment.gender || 'Not provided' }}</div>
                 </div>
               </div>
             </div>
             
             <!-- Contact Information Section -->
-            <div class="mb-6">
-              <div class="flex items-center mb-2">
-                <div class="bg-green-100 rounded-full p-1.5 mr-2">
-                  <PhoneIcon class="w-4 h-4 text-green-500" />
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="bg-green-100 rounded-full p-2">
+                <PhoneIcon class="w-5 h-5 text-green-600" />
                 </div>
-                <h4 class="text-sm font-medium text-gray-700">Contact Information</h4>
+              <h4 class="text-lg font-medium text-gray-900">Contact Information</h4>
               </div>
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Email -->
                 <div>
-                  <div class="text-xs text-gray-500 mb-1">Email</div>
-                  <div class="text-sm font-medium text-gray-900">{{ selectedAppointment.ownerEmail || 'Not provided' }}</div>
+                <div class="text-sm text-gray-500 mb-2">Email</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.ownerEmail || 'Not provided' }}</div>
                 </div>
                 
                 <!-- Phone -->
                 <div>
-                  <div class="text-xs text-gray-500 mb-1">Phone</div>
-                  <div class="text-sm font-medium text-gray-900">{{ selectedAppointment.contactInformation || 'Not provided' }}</div>
+                <div class="text-sm text-gray-500 mb-2">Phone</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.contactInformation || 'Not provided' }}</div>
                 </div>
               </div>
             </div>
             
             <!-- Address Section -->
-            <div>
-              <div class="flex items-center mb-2">
-                <div class="bg-red-100 rounded-full p-1.5 mr-2">
-                  <MapPinIcon class="w-4 h-4 text-red-500" />
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="bg-red-100 rounded-full p-2">
+                <MapPinIcon class="w-5 h-5 text-red-600" />
                 </div>
-                <h4 class="text-sm font-medium text-gray-700">Address</h4>
+              <h4 class="text-lg font-medium text-gray-900">Address</h4>
               </div>
               
-              <div class="mt-3">
-                <div class="text-xs text-gray-500 mb-1">Street Address</div>
-                <div class="text-sm font-medium text-gray-900">{{ selectedAppointment.streetAddress || 'Not provided' }}</div>
-              </div>
+            <div>
+              <div class="text-sm text-gray-500 mb-2">Street Address</div>
+              <div class="text-base font-medium text-gray-900">{{ selectedAppointment.streetAddress || 'Not provided' }}</div>
             </div>
           </div>
         </div>
@@ -631,67 +1003,91 @@
         </div>
         
         <!-- Schedule Information Step -->
-        <div v-if="currentApprovalStep.id === 'schedule'" class="space-y-4">
-          <div class="bg-white rounded-lg p-4 border border-gray-200">
-            <h3 class="text-lg font-medium text-gray-800 mb-3">Appointment Details</h3>
+        <div v-if="currentApprovalStep.id === 'schedule'" class="space-y-6">
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="bg-purple-100 rounded-full p-2">
+                <CalendarIcon class="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 class="text-lg font-medium text-gray-900">Appointment Details</h3>
+            </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-                <div class="text-sm text-gray-500 mb-1">Date</div>
-                <div class="text-base text-gray-900">{{ selectedAppointment.date ? formatDate(selectedAppointment.date) : 'N/A' }}</div>
+                <div class="text-sm text-gray-500 mb-2">Date</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.date ? formatDate(selectedAppointment.date) : 'N/A' }}</div>
               </div>
               <div>
-                <div class="text-sm text-gray-500 mb-1">Time</div>
-                <div class="text-base text-gray-900">{{ selectedAppointment.time || 'N/A' }}</div>
+                <div class="text-sm text-gray-500 mb-2">Time</div>
+                <div class="text-base font-medium text-gray-900">{{ selectedAppointment.time || 'N/A' }}</div>
               </div>
             </div>
             
             <!-- Services -->
-            <div class="mt-4">
-              <div class="text-sm text-gray-500 mb-2">Services</div>
+            <div>
+              <div class="text-sm text-gray-500 mb-3">Services</div>
               <div class="flex flex-wrap gap-2">
-                <span 
-                  v-for="(service, index) in selectedAppointment.serviceNames" 
+                <div 
+                  v-for="(serviceId, index) in selectedAppointment.services" 
                   :key="index"
-                  class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                  class="flex flex-col items-start"
                 >
-                  {{ service }}
+                  <span class="px-3 py-2 bg-blue-100 text-blue-800 text-sm rounded-lg font-medium mb-1">
+                    {{ getServiceDisplayName(serviceId) }}
+                  </span>
+                  <span 
+                    v-if="getServiceCategory(serviceId)"
+                    class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded text-center"
+                    :title="getServiceCategory(serviceId)?.description"
+                  >
+                    {{ getServiceCategory(serviceId)?.name }}
                 </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
         
         <!-- Confirmation Step - Updated for multiple pets -->
-        <div v-if="currentApprovalStep.id === 'confirm'" class="space-y-4">
-          <div class="bg-white rounded-lg p-4 border border-gray-200">
-            <h3 class="text-lg font-medium text-gray-800 mb-3">Appointment Summary</h3>
+        <div v-if="currentApprovalStep.id === 'confirm'" class="space-y-6">
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="bg-indigo-100 rounded-full p-2">
+                <CheckCircleIcon class="w-5 h-5 text-indigo-600" />
+              </div>
+              <h3 class="text-lg font-medium text-gray-900">Appointment Summary</h3>
+            </div>
             
-            <div class="space-y-4">
+            <div class="space-y-6">
               <!-- Owner Summary - Enhanced with all details -->
-              <div class="bg-gray-50 p-4 rounded-lg">
-                <div class="text-sm font-medium text-gray-500 mb-2">Owner</div>
-                <div class="text-lg font-medium text-gray-900">{{ selectedAppointment.ownerName || 'Unknown Owner' }}</div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-2">
+              <div class="bg-gray-50 p-6 rounded-lg">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="bg-blue-100 rounded-full p-2">
+                    <UserIcon class="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div class="text-base font-medium text-gray-700">Owner Information</div>
+                </div>
+                <div class="text-lg font-medium text-gray-900 mb-4">{{ selectedAppointment.ownerName || 'Unknown Owner' }}</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <div class="text-xs text-gray-500">Email</div>
-                    <div class="text-sm text-gray-700">{{ selectedAppointment.ownerEmail || 'No email' }}</div>
+                    <div class="text-sm text-gray-500 mb-2">Email</div>
+                    <div class="text-base font-medium text-gray-700">{{ selectedAppointment.ownerEmail || 'No email' }}</div>
                   </div>
                   <div>
-                    <div class="text-xs text-gray-500">Phone</div>
-                    <div class="text-sm text-gray-700">{{ selectedAppointment.contactInformation || 'No contact info' }}</div>
+                    <div class="text-sm text-gray-500 mb-2">Phone</div>
+                    <div class="text-base font-medium text-gray-700">{{ selectedAppointment.contactInformation || 'No contact info' }}</div>
                   </div>
                   <div>
-                    <div class="text-xs text-gray-500">Gender</div>
-                    <div class="text-sm text-gray-700 capitalize">{{ selectedAppointment.gender || 'Not provided' }}</div>
+                    <div class="text-sm text-gray-500 mb-2">Gender</div>
+                    <div class="text-base font-medium text-gray-700 capitalize">{{ selectedAppointment.gender || 'Not provided' }}</div>
                   </div>
                   <div>
-                    <div class="text-xs text-gray-500">Age</div>
-                    <div class="text-sm text-gray-700">{{ selectedAppointment.age || calculateAge(selectedAppointment.dateOfBirth) || 'Not provided' }}</div>
+                    <div class="text-sm text-gray-500 mb-2">Age</div>
+                    <div class="text-base font-medium text-gray-700">{{ selectedAppointment.age || calculateAge(selectedAppointment.dateOfBirth) || 'Not provided' }}</div>
                   </div>
-                  <div class="col-span-1 md:col-span-2">
-                    <div class="text-xs text-gray-500">Address</div>
-                    <div class="text-sm text-gray-700">{{ selectedAppointment.streetAddress || 'Not provided' }}</div>
+                  <div class="md:col-span-2">
+                    <div class="text-sm text-gray-500 mb-2">Address</div>
+                    <div class="text-base font-medium text-gray-700">{{ selectedAppointment.streetAddress || 'Not provided' }}</div>
                   </div>
                 </div>
               </div>
@@ -785,24 +1181,43 @@
               </div>
               
               <!-- Schedule Summary -->
-              <div class="bg-gray-50 p-4 rounded-lg">
-                <div class="text-sm font-medium text-gray-500 mb-2">Schedule</div>
+              <div class="bg-gray-50 p-6 rounded-lg">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="bg-purple-100 rounded-full p-2">
+                    <CalendarIcon class="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div class="text-base font-medium text-gray-700">Schedule</div>
+                </div>
                 <div class="text-lg font-medium text-gray-900">
                   {{ selectedAppointment.date ? formatDate(selectedAppointment.date) : 'N/A' }} at {{ selectedAppointment.time || 'N/A' }}
                 </div>
               </div>
               
               <!-- Services Summary -->
-              <div class="bg-gray-50 p-4 rounded-lg">
-                <div class="text-sm font-medium text-gray-500 mb-2">Services</div>
+              <div class="bg-gray-50 p-6 rounded-lg">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="bg-blue-100 rounded-full p-2">
+                    <StethoscopeIcon class="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div class="text-base font-medium text-gray-700">Services</div>
+                </div>
                 <div class="flex flex-wrap gap-2">
-                  <span 
-                    v-for="(service, index) in selectedAppointment.serviceNames" 
+                  <div 
+                    v-for="(serviceId, index) in selectedAppointment.services" 
                     :key="index"
-                    class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                    class="flex flex-col items-start"
                   >
-                    {{ service }}
+                    <span class="px-3 py-2 bg-blue-100 text-blue-800 text-sm rounded-lg font-medium mb-1">
+                      {{ getServiceDisplayName(serviceId) }}
+                    </span>
+                    <span 
+                      v-if="getServiceCategory(serviceId)"
+                      class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded text-center"
+                      :title="getServiceCategory(serviceId)?.description"
+                    >
+                      {{ getServiceCategory(serviceId)?.name }}
                   </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -879,6 +1294,499 @@
 
 <!-- Loading Spinner Overlay - Show for operations -->
 <LoadingSpinner v-if="isLoading || initialLoading" isOverlay :text="initialLoading ? 'Loading appointments...' : 'Processing...'" />
+
+<!-- Action Confirmation Modal -->
+<div v-if="showActionConfirmModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+  <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+    <div class="flex items-center gap-3 mb-3">
+      <div :class="[
+        'w-10 h-10 rounded-full flex items-center justify-center',
+        actionTypeToConfirm==='approve' ? 'bg-green-100' : actionTypeToConfirm==='complete' ? 'bg-emerald-100' : 'bg-red-100'
+      ]">
+        <component 
+          :is="actionTypeToConfirm==='approve' ? CheckIcon : actionTypeToConfirm==='complete' ? CheckCircleIcon : XIcon" 
+          :class="['w-5 h-5', actionTypeToConfirm==='approve' ? 'text-green-600' : actionTypeToConfirm==='complete' ? 'text-emerald-600' : 'bg-red-600']" 
+        />
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900">
+        {{ actionTypeToConfirm==='approve' ? 'Approve Appointment' : actionTypeToConfirm==='complete' ? 'Mark as Completed' : 'Reject Appointment' }}
+      </h3>
+    </div>
+    <p class="text-sm text-gray-600 mb-5">
+      {{ actionTypeToConfirm==='approve' 
+        ? 'Are you sure you want to approve this appointment?' 
+        : actionTypeToConfirm==='complete' 
+          ? 'Mark this appointment as completed?' 
+          : 'Are you sure you want to reject this appointment?' }}
+    </p>
+    <div class="flex gap-2">
+      <button @click="closeActionConfirm" class="flex-1 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-gray-50" :disabled="actionLoading">Cancel</button>
+      <button @click="confirmAction" :disabled="actionLoading" class="flex-1 py-2 rounded-full text-white" :class="actionTypeToConfirm==='approve' ? 'bg-green-600 hover:bg-green-700' : actionTypeToConfirm==='complete' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'">
+        <span v-if="actionLoading">Processing...</span>
+        <span v-else>{{ actionTypeToConfirm==='approve' ? 'Approve' : actionTypeToConfirm==='complete' ? 'Complete' : 'Reject' }}</span>
+      </button>
+    </div>
+  </div>
+  </div>
+
+<!-- Completion Form Modal -->
+<div v-if="showCompletionFormModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <h2 class="text-xl font-semibold text-gray-900">Complete Appointment</h2>
+      <button @click="closeCompletionFormModal" class="text-gray-400 hover:text-gray-600">
+        <XIcon class="w-5 h-5" />
+      </button>
+    </div>
+    
+    <div class="p-6">
+      <!-- Appointment Summary -->
+      <div class="bg-gray-50 rounded-lg p-4 mb-6">
+        <h3 class="text-lg font-medium text-gray-800 mb-3">Appointment Summary</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Owner</div>
+            <div class="font-medium text-gray-900">{{ selectedAppointment?.ownerName || 'Unknown' }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Pet(s)</div>
+            <div class="font-medium text-gray-900">
+              {{ selectedAppointment?.petNames?.join(', ') || selectedAppointment?.petName || 'No pet info' }}
+            </div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Date & Time</div>
+            <div class="font-medium text-gray-900">
+              {{ formatDate(selectedAppointment?.date) }} at {{ selectedAppointment?.time }}
+            </div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Services</div>
+            <div class="font-medium text-gray-900">
+              <div class="flex flex-wrap gap-1">
+                <div 
+                  v-for="(serviceId, index) in selectedAppointment?.services" 
+                  :key="index"
+                  class="flex flex-col items-start"
+                >
+                  <span class="text-sm">{{ getServiceDisplayName(serviceId) }}</span>
+                  <span 
+                    v-if="getServiceCategory(serviceId)"
+                    class="px-1 py-0.5 bg-gray-100 text-gray-600 text-xs rounded text-center"
+                    :title="getServiceCategory(serviceId)?.description"
+                  >
+                    {{ getServiceCategory(serviceId)?.name }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Completion Form -->
+      <form @submit.prevent="submitCompletionForm" class="space-y-6">
+        <!-- Service Summary Section -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 flex items-center gap-2">
+            <StethoscopeIcon class="w-5 h-5 text-blue-500" />
+            Service Summary
+          </h3>
+          
+          <!-- Services with individual notes -->
+          <div class="space-y-4">
+            <div v-for="(serviceId, index) in selectedAppointment?.services" :key="index" class="border border-gray-200 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-medium text-gray-900">{{ getServiceDisplayName(serviceId) }}</h4>
+                <span class="text-sm text-gray-500">Service {{ index + 1 }}</span>
+              </div>
+              
+              <!-- Category Information -->
+              <div v-if="getServiceCategory(serviceId)" class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-blue-800">Category</span>
+                </div>
+                <div class="text-sm text-blue-700">
+                  <div class="font-medium">{{ getServiceCategory(service)?.name }}</div>
+                  <div class="text-blue-600">{{ getServiceCategory(service)?.description }}</div>
+                </div>
+              </div>
+              
+
+              
+              <!-- Service Details (if available) -->
+              <div v-if="getServiceById(serviceId)" class="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-green-800">Service Details</span>
+                </div>
+                <div class="text-sm text-green-700">
+                  <div v-if="getServiceById(serviceId)?.fees" class="mb-1">
+                    <span class="font-medium">Fees:</span> {{ getServiceById(serviceId)?.fees }}
+                  </div>
+                  <div v-if="getServiceById(serviceId)?.processingTime" class="mb-1">
+                    <span class="font-medium">Processing Time:</span> {{ getServiceById(serviceId)?.processingTime }}
+                  </div>
+                  <div v-if="getServiceById(serviceId)?.classification" class="mb-1">
+                    <span class="font-medium">Classification:</span> {{ getServiceById(serviceId)?.classification }}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Service-specific fields -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select v-model="completionForm.services[index].status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="completed">Completed</option>
+                    <option value="partially_completed">Partially Completed</option>
+                    <option value="requires_followup">Requires Follow-up</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
+                  <input 
+                    v-model.number="completionForm.services[index].duration" 
+                    type="number" 
+                    min="0"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="30"
+                  />
+                </div>
+                
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Service Notes</label>
+                  <textarea 
+                    v-model="completionForm.services[index].notes" 
+                    rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Describe what was done, findings, recommendations..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Pet Health Assessment -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 flex items-center gap-2">
+            <PawPrintIcon class="w-5 h-5 text-green-500" />
+            Pet Health Assessment
+          </h3>
+          
+          <div class="space-y-4">
+            <div v-for="(pet, petIndex) in getPetsArray(selectedAppointment)" :key="petIndex" class="border border-gray-200 rounded-lg p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                  <img 
+                    v-if="pet.photo"
+                    :src="pet.photo" 
+                    :alt="pet.name"
+                    class="w-full h-full object-cover" 
+                  />
+                  <img 
+                    v-else
+                    :src="defaultPetPhotoURL" 
+                    :alt="pet.name"
+                    class="w-full h-full object-cover" 
+                  />
+                </div>
+                <div>
+                  <h4 class="font-medium text-gray-900">{{ pet.name }}</h4>
+                  <p class="text-sm text-gray-500">{{ pet.species }} • {{ pet.breed || 'Unknown breed' }}</p>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Overall Health</label>
+                  <select v-model="completionForm.pets[petIndex].overallHealth" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                  <input 
+                    v-model.number="completionForm.pets[petIndex].weight" 
+                    type="number" 
+                    step="0.1"
+                    min="0"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="5.2"
+                  />
+                </div>
+                
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Health Notes</label>
+                  <textarea 
+                    v-model="completionForm.pets[petIndex].healthNotes" 
+                    rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Describe pet's condition, any issues found, recommendations..."
+                  ></textarea>
+                </div>
+                
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Follow-up Required</label>
+                  <div class="space-y-2">
+                    <label class="flex items-center">
+                      <input 
+                        v-model="completionForm.pets[petIndex].followUpRequired" 
+                        type="checkbox" 
+                        class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span class="ml-2 text-sm text-gray-700">Schedule follow-up appointment</span>
+                    </label>
+                    
+                    <div v-if="completionForm.pets[petIndex].followUpRequired" class="ml-6">
+                      <input 
+                        v-model="completionForm.pets[petIndex].followUpNotes" 
+                        type="text"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Reason for follow-up, recommended timeline..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Prescription Section - HIGH PRIORITY -->
+        <div class="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg p-6 shadow-lg">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold text-red-800 flex items-center gap-2">
+              🏥 PRESCRIPTION & MEDICATIONS
+            </h3>
+          </div>
+          
+          <div class="space-y-6">
+            <!-- Medications List -->
+            <div>
+              <label class="block text-sm font-bold text-red-700 mb-2">Medications Prescribed</label>
+              <div class="space-y-3">
+                <div v-for="(medication, index) in completionForm.prescription.medications" :key="index" class="bg-white border border-red-200 rounded-lg p-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-semibold text-gray-900">Medication {{ index + 1 }}</h4>
+                    <button 
+                      type="button"
+                      @click="removeMedication(index)"
+                      class="text-red-500 hover:text-red-700 text-sm font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Medication Name</label>
+                      <input 
+                        v-model="medication.name" 
+                        type="text"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="e.g., Amoxicillin, Metronidazole"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Dosage</label>
+                      <input 
+                        v-model="medication.dosage" 
+                        type="text"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="e.g., 250mg, 5ml"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+                      <select v-model="medication.frequency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <option value="">Select frequency</option>
+                        <option value="Once daily">Once daily</option>
+                        <option value="Twice daily">Twice daily</option>
+                        <option value="Three times daily">Three times daily</option>
+                        <option value="Every 8 hours">Every 8 hours</option>
+                        <option value="Every 12 hours">Every 12 hours</option>
+                        <option value="As needed">As needed</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                      <input 
+                        v-model="medication.duration" 
+                        type="text"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="e.g., 7 days, 2 weeks"
+                      />
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Special Instructions</label>
+                      <textarea 
+                        v-model="medication.instructions" 
+                        rows="2"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Special instructions for this medication..."
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
+                
+                <button 
+                  type="button"
+                  @click="addMedication"
+                  class="w-full border-2 border-dashed border-red-300 text-red-600 py-3 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors font-medium"
+                >
+                  + Add Another Medication
+                </button>
+              </div>
+            </div>
+            
+            <!-- General Prescription Instructions -->
+            <div>
+              <label class="block text-sm font-bold text-red-700 mb-2">General Prescription Instructions</label>
+              <textarea 
+                v-model="completionForm.prescription.instructions" 
+                rows="4"
+                class="w-full px-3 py-2 border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="General instructions for all medications, administration tips, storage requirements..."
+              ></textarea>
+            </div>
+            
+            <!-- Warnings and Contraindications -->
+            <div>
+              <label class="block text-sm font-bold text-red-700 mb-2">⚠️ Warnings & Contraindications</label>
+              <textarea 
+                v-model="completionForm.prescription.warnings" 
+                rows="3"
+                class="w-full px-3 py-2 border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Important warnings, side effects to watch for, contraindications..."
+              ></textarea>
+            </div>
+            
+            <!-- Follow-up Required -->
+            <div class="bg-white border border-red-200 rounded-lg p-4">
+              <label class="block text-sm font-bold text-red-700 mb-3">Follow-up Required</label>
+              <div class="space-y-3">
+                <label class="flex items-center">
+                  <input 
+                    v-model="completionForm.prescription.followUpRequired" 
+                    type="checkbox" 
+                    class="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <span class="ml-2 text-sm font-medium text-gray-700">Patient requires follow-up for prescription monitoring</span>
+                </label>
+                
+                <div v-if="completionForm.prescription.followUpRequired" class="ml-6">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Follow-up Date</label>
+                  <input 
+                    v-model="completionForm.prescription.followUpDate" 
+                    type="date"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- General Notes -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            General Notes & Recommendations
+          </h3>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Treatment Summary</label>
+              <textarea 
+                v-model="completionForm.generalNotes.treatmentSummary" 
+                rows="4"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Overall summary of treatments provided, procedures performed..."
+              ></textarea>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Owner Instructions</label>
+              <textarea 
+                v-model="completionForm.generalNotes.ownerInstructions" 
+                rows="4"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Instructions for pet owner, home care, medications, diet changes..."
+              ></textarea>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Next Steps</label>
+              <textarea 
+                v-model="completionForm.generalNotes.nextSteps" 
+                rows="3"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Recommended next steps, when to return, preventive care..."
+              ></textarea>
+            </div>
+          </div>
+        </div>
+        
+          <!-- Form Actions -->
+          <div class="flex justify-between pt-4 border-t border-gray-200">
+            <button 
+              type="button"
+              @click="printPrescription" 
+              :disabled="!hasPrescriptionData"
+              class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+              </svg>
+              Print Prescription
+            </button>
+            
+            <div class="flex gap-3">
+              <button 
+                type="button"
+                @click="closeCompletionFormModal" 
+                class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                :disabled="completionFormLoading"
+                class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <span v-if="completionFormLoading">Completing...</span>
+                <span v-else>Complete Appointment</span>
+              </button>
+            </div>
+          </div>
+      </form>
+    </div>
+  </div>
+  </div>
 
 <!-- Confirmation Modal -->
 <div 
@@ -957,10 +1865,688 @@ class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-5
   </div>
 </div>
 </div>
+
+
+
+<!-- Bulk Action Modal -->
+<div 
+v-if="showBulkActionModal" 
+class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+>
+<div class="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+  <div class="flex flex-col items-center text-center">
+    <div class="w-12 h-12 rounded-full flex items-center justify-center mb-4"
+         :class="bulkActionType === 'approve' ? 'bg-green-100' : 'bg-red-100'">
+      <component 
+        :is="bulkActionType === 'approve' ? CheckIcon : XIcon" 
+        class="w-6 h-6"
+        :class="bulkActionType === 'approve' ? 'text-green-600' : 'text-red-600'"
+      />
+    </div>
+    <h2 class="text-xl font-bold text-gray-900 mb-2">
+      {{ bulkActionType === 'approve' ? 'Approve' : 'Reject' }} {{ selectedAppointments.size }} Appointment{{ selectedAppointments.size > 1 ? 's' : '' }}?
+    </h2>
+    <p class="text-gray-600 mb-4">
+      Are you sure you want to {{ bulkActionType === 'approve' ? 'approve' : 'reject' }} 
+      {{ selectedAppointments.size }} appointment{{ selectedAppointments.size > 1 ? 's' : '' }}?
+    </p>
+    
+    <!-- Reason for rejection -->
+    <div v-if="bulkActionType === 'reject'" class="w-full mb-4">
+      <label class="block text-left text-sm font-medium text-gray-700 mb-1">
+        Reason for rejection:
+      </label>
+      <textarea
+        v-model="bulkActionReason"
+        rows="3"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+        placeholder="Enter reason for rejection..."
+        required
+      ></textarea>
+      <p v-if="bulkActionError" class="mt-1 text-left text-xs text-red-600">
+        {{ bulkActionError }}
+      </p>
+    </div>
+    
+    <div class="flex space-x-3 w-full">
+      <button 
+        @click="closeBulkActionModal" 
+        class="flex-1 py-2 border border-gray-300 text-gray-700 rounded-full hover:bg-gray-50"
+      >
+        Cancel
+      </button>
+      <button 
+        @click="executeBulkAction" 
+        :disabled="bulkActionLoading || (bulkActionType === 'reject' && !bulkActionReason.trim())"
+        class="flex-1 py-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+        :class="bulkActionType === 'approve' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-red-600 text-white hover:bg-red-700'"
+      >
+        <span v-if="bulkActionLoading">Processing...</span>
+        <span v-else>{{ bulkActionType === 'approve' ? 'Approve' : 'Reject' }} All</span>
+      </button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Reschedule Panel -->
+<div 
+v-if="showAutoReschedulePanel" 
+class="fixed inset-0 bg-black bg-opacity-20 z-50"
+@click="closeAutoReschedulePanel"
+>
+<div 
+  class="absolute right-0 top-0 h-full w-[500px] bg-white shadow-2xl transform transition-transform duration-300"
+  @click.stop
+>
+  <div class="h-full flex flex-col">
+    <!-- Header -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-100">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-900">Request Reschedule</h2>
+        <p class="text-sm text-gray-500 mt-1">Suggest a new time to the client</p>
+      </div>
+      <button @click="closeAutoReschedulePanel" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+        <XIcon class="w-5 h-5" />
+      </button>
+    </div>
+    
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto p-6">
+      <div v-if="reschedulingAppointment" class="space-y-6">
+        <!-- Current Appointment Summary -->
+        <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <CalendarIcon class="w-5 h-5 text-blue-600" />
+          </div>
+            <div>
+              <h3 class="font-medium text-gray-900">Current Appointment</h3>
+              <p class="text-sm text-gray-600">{{ reschedulingAppointment.ownerName }}</p>
+        </div>
+              </div>
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span class="text-gray-500">Date:</span>
+              <span class="ml-2 font-medium">{{ formatDate(reschedulingAppointment.date) }}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Time:</span>
+              <span class="ml-2 font-medium">{{ reschedulingAppointment.time }}</span>
+          </div>
+        </div>
+          <div class="mt-3 pt-3 border-t border-gray-200">
+            <span class="text-gray-500 text-sm">Status:</span>
+            <span :class="getStatusClass(reschedulingAppointment.status)" class="ml-2 text-xs">
+              {{ formatStatus(reschedulingAppointment.status) }}
+            </span>
+          </div>
+        </div>
+        
+        <!-- Reschedule Reason -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-3">Reason for Reschedule *</label>
+          <textarea 
+            v-model="rescheduleReason"
+            rows="3"
+            class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors resize-none"
+            placeholder="Explain why you need to reschedule this appointment..."
+          ></textarea>
+          <div v-if="!rescheduleReason.trim()" class="text-xs text-orange-600 mt-2 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            A reason is required
+            </div>
+          </div>
+        
+        <!-- Date Selection -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-3">Preferred Date</label>
+          <button 
+            @click="showDatePicker = true"
+            class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <CalendarIcon class="w-5 h-5 text-gray-500" />
+              <span class="text-gray-700">
+                {{ selectedDate ? formatDate(selectedDate) : 'Select a date' }}
+              </span>
+            </div>
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Time Selection -->
+        <div v-if="selectedDate">
+          <label class="block text-sm font-medium text-gray-700 mb-3">Preferred Time</label>
+          
+          <!-- AM/PM Toggle -->
+          <div class="flex gap-2 mb-4">
+            <button 
+              @click="selectedTimePeriod = 'AM'"
+              class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+              :class="selectedTimePeriod === 'AM' ? 'bg-blue-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+            >
+              Morning
+            </button>
+            <button 
+              @click="selectedTimePeriod = 'PM'"
+              class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+              :class="selectedTimePeriod === 'PM' ? 'bg-blue-500 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+            >
+              Afternoon
+            </button>
+          </div>
+          
+          <!-- Time Slots -->
+          <div class="grid grid-cols-3 gap-3">
+            <button 
+              v-for="option in filteredTimeOptions" 
+              :key="option.value"
+              @click="selectAutoRescheduleOption(option)"
+              class="p-3 text-center border rounded-xl transition-all duration-200 hover:shadow-sm"
+              :class="{ 
+                'border-blue-500 bg-blue-50 shadow-sm': selectedAutoOption === option.value,
+                'border-gray-200 hover:border-gray-300': selectedAutoOption !== option.value
+              }"
+            >
+              <div class="font-medium text-gray-900">{{ option.displayTime }}</div>
+              <div class="text-xs text-gray-500 mt-1">Available</div>
+            </button>
+          </div>
+          
+          <div v-if="filteredTimeOptions.length === 0" class="text-center py-6 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-sm font-medium">No available times</p>
+            <p class="text-xs">All slots are booked or conflict with existing appointments</p>
+          </div>
+        </div>
+        
+        <!-- Selected Time Preview -->
+        <div v-if="selectedAutoOption" class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+          </div>
+                  <div>
+              <h4 class="font-medium text-blue-900">Suggested Time</h4>
+              <p class="text-sm text-blue-700">{{ selectedAutoRescheduleDate }} at {{ selectedAutoRescheduleTime }}</p>
+                  </div>
+                  </div>
+                </div>
+        
+        <!-- Info Note -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="text-sm text-amber-800">
+              <p class="font-medium">Client will be notified</p>
+              <p class="text-amber-700 mt-1">They can accept, decline, or suggest an alternative time. The appointment won't be automatically changed.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="p-6 border-t border-gray-100 bg-gray-50">
+      <button 
+        @click="executeRescheduleRequest"
+        :disabled="autoRescheduleLoading || !selectedAutoOption || !selectedDate || !rescheduleReason.trim()"
+        class="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-medium hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+      >
+        <span v-if="autoRescheduleLoading" class="flex items-center justify-center gap-2">
+          <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Sending Request...
+        </span>
+        <span v-else class="flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+          </svg>
+          Send Reschedule Request
+        </span>
+      </button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Date Picker Modal -->
+<div 
+  v-if="showDatePicker" 
+  class="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center"
+  @click="showDatePicker = false"
+>
+  <div 
+    class="bg-white rounded-lg shadow-xl p-6 w-80 max-w-sm"
+    @click.stop
+  >
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900">Select Date</h3>
+      <button @click="showDatePicker = false" class="text-gray-400 hover:text-gray-600">
+        <XIcon class="w-5 h-5" />
+      </button>
+    </div>
+    
+    <!-- Calendar -->
+    <div class="space-y-4">
+      <!-- Month Navigation -->
+      <div class="flex items-center justify-between">
+        <button 
+          @click="previousMonth"
+          class="p-1 hover:bg-gray-100 rounded"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+        </button>
+        <h4 class="text-sm font-medium text-gray-900">{{ currentMonthYear }}</h4>
+        <button 
+          @click="nextMonth"
+          class="p-1 hover:bg-gray-100 rounded"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Day Headers -->
+      <div class="grid grid-cols-7 gap-1">
+        <div v-for="day in weekDays" :key="day" class="text-center text-xs font-medium text-gray-500 py-1">
+          {{ day }}
+        </div>
+      </div>
+      
+      <!-- Calendar Days -->
+      <div class="grid grid-cols-7 gap-1">
+        <div 
+          v-for="day in calendarDays" 
+          :key="day.date"
+          @click="selectCalendarDate(day)"
+          class="text-center py-2 text-sm cursor-pointer rounded hover:bg-gray-100 transition-colors"
+          :class="{
+            'text-gray-400': !day.isCurrentMonth,
+            'text-gray-900': day.isCurrentMonth && !day.isSelected && !day.isToday,
+            'bg-blue-100 text-blue-700 font-medium': day.isSelected,
+            'bg-gray-200 text-gray-700 font-medium': day.isToday && !day.isSelected,
+            'text-red-500': day.isPast,
+            'cursor-not-allowed opacity-50': day.isPast || !day.isWorkingDay
+          }"
+        >
+          {{ day.dayNumber }}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
+      <button 
+        @click="showDatePicker = false"
+        class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+      >
+        Cancel
+      </button>
+      <button 
+        @click="confirmDateSelection"
+        :disabled="!tempSelectedDate"
+        class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Confirm
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Appointment Details Modal -->
+<div 
+  v-if="showAppointmentDetailsModal" 
+  class="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center p-4"
+  @click="closeAppointmentDetailsModal"
+>
+  <div 
+    class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+    @click.stop
+  >
+    <!-- Header -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <h2 class="text-xl font-semibold text-gray-900">Appointment Details</h2>
+      <button @click="closeAppointmentDetailsModal" class="text-gray-400 hover:text-gray-600">
+        <XIcon class="w-5 h-5" />
+      </button>
+    </div>
+    
+    <!-- Content -->
+    <div class="p-6" v-if="selectedAppointment">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left Column - Appointment Information -->
+        <div class="space-y-6">
+          <!-- Owner Information -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center gap-2">
+              <UserIcon class="w-5 h-5 text-blue-500" />
+              Owner Information
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Name</div>
+                <div class="font-medium text-gray-900">{{ selectedAppointment.ownerName || 'Not provided' }}</div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Email</div>
+                <div class="font-medium text-gray-900">{{ selectedAppointment.ownerEmail || 'Not provided' }}</div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Phone</div>
+                <div class="font-medium text-gray-900">{{ selectedAppointment.contactInformation || 'Not provided' }}</div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Gender</div>
+                <div class="font-medium text-gray-900 capitalize">{{ selectedAppointment.gender || 'Not provided' }}</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Pet Information -->
+          <div class="bg-gray-50 rounded-lg p-4" v-if="hasPet(selectedAppointment)">
+            <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center gap-2">
+              <PawPrintIcon class="w-5 h-5 text-green-500" />
+              Pet Information
+            </h3>
+            
+            <!-- Single Pet -->
+            <div v-if="selectedAppointment.petName && !hasMultiplePets(selectedAppointment)" class="space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="w-16 h-16 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                  <img 
+                    v-if="selectedAppointment.petPhotoURL"
+                    :src="selectedAppointment.petPhotoURL" 
+                    :alt="selectedAppointment.petName"
+                    class="w-full h-full object-cover" 
+                    @error="onPetImageError"
+                  />
+                  <img 
+                    v-else
+                    :src="defaultPetPhotoURL" 
+                    :alt="selectedAppointment.petName"
+                    class="w-full h-full object-cover" 
+                  />
+                </div>
+                <div>
+                  <div class="text-xl font-medium text-gray-900">{{ selectedAppointment.petName }}</div>
+                  <div class="text-sm text-gray-500">{{ selectedAppointment.petSpecies || 'Unknown Species' }}</div>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div class="text-sm text-gray-500 mb-1">Breed</div>
+                  <div class="font-medium text-gray-900">{{ selectedAppointment.petBreed || 'Not provided' }}</div>
+                </div>
+                <div>
+                  <div class="text-sm text-gray-500 mb-1">Gender</div>
+                  <div class="font-medium text-gray-900 capitalize">{{ formatGender(selectedAppointment.petGender) || 'Not provided' }}</div>
+                </div>
+                <div>
+                  <div class="text-sm text-gray-500 mb-1">Age</div>
+                  <div class="font-medium text-gray-900">{{ formatPetAge(selectedAppointment) || 'Not provided' }}</div>
+                </div>
+                <div>
+                  <div class="text-sm text-gray-500 mb-1">Weight</div>
+                  <div class="font-medium text-gray-900">{{ selectedAppointment.petWeight ? `${selectedAppointment.petWeight} kg` : 'Not provided' }}</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Multiple Pets -->
+            <div v-else-if="hasMultiplePets(selectedAppointment)" class="space-y-4">
+              <div class="text-sm text-gray-600 mb-3">
+                {{ getPetCount(selectedAppointment) }} pets associated with this appointment
+              </div>
+              
+              <div v-for="(pet, index) in getPetsArray(selectedAppointment)" :key="index" class="border border-gray-200 rounded-lg p-3">
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    <img 
+                      v-if="pet.photo"
+                      :src="pet.photo" 
+                      :alt="pet.name"
+                      class="w-full h-full object-cover" 
+                      @error="onPetImageError"
+                    />
+                    <img 
+                      v-else
+                      :src="defaultPetPhotoURL" 
+                      :alt="pet.name"
+                      class="w-full h-full object-cover" 
+                    />
+                  </div>
+                  <div>
+                    <div class="font-medium text-gray-900">{{ pet.name }}</div>
+                    <div class="text-sm text-gray-500">{{ pet.species || 'Unknown Species' }}</div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span class="text-gray-500">Breed:</span>
+                    <span class="font-medium text-gray-900 ml-1">{{ pet.breed || 'Not provided' }}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500">Gender:</span>
+                    <span class="font-medium text-gray-900 ml-1 capitalize">{{ formatGender(pet.gender) || 'Not provided' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Appointment Details -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center gap-2">
+              <CalendarIcon class="w-5 h-5 text-purple-500" />
+              Appointment Details
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Date</div>
+                <div class="font-medium text-gray-900">{{ formatDate(selectedAppointment.date) }}</div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Time</div>
+                <div class="font-medium text-gray-900">{{ selectedAppointment.time || 'Not set' }}</div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Status</div>
+                <div class="font-medium text-gray-900">
+                  <span 
+                    class="px-2 py-1 text-xs font-medium rounded-full"
+                    :class="{
+                      'bg-yellow-100 text-yellow-800': selectedAppointment.status === 'pending',
+                      'bg-green-100 text-green-800': selectedAppointment.status === 'approved',
+                      'bg-red-100 text-red-800': selectedAppointment.status === 'rejected',
+                      'bg-blue-100 text-blue-800': selectedAppointment.status === 'completed',
+                      'bg-gray-100 text-gray-800': selectedAppointment.status === 'cancelled',
+                      'bg-slate-100 text-slate-800': selectedAppointment.status === 'ended',
+                      'bg-orange-100 text-orange-800': isExpired(selectedAppointment)
+                    }"
+                  >
+                    {{ isExpired(selectedAppointment) ? 'Expired' : formatStatus(selectedAppointment.status) }}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-500 mb-1">Created</div>
+                <div class="font-medium text-gray-900">{{ formatDateTime(selectedAppointment.createdAt) }}</div>
+              </div>
+            </div>
+            
+            <!-- Services -->
+            <div class="mt-4">
+              <div class="text-sm text-gray-500 mb-2">Services</div>
+              <div class="flex flex-wrap gap-2">
+                <div 
+                  v-for="(service, index) in selectedAppointment.serviceNames" 
+                  :key="index"
+                  class="flex flex-col items-start"
+                >
+                  <span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full mb-1">
+                    {{ getServiceDisplayName(service) }}
+                  </span>
+                  <span 
+                    v-if="getServiceCategory(service)"
+                    class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded text-center"
+                    :title="getServiceCategory(service)?.description"
+                  >
+                    {{ getServiceCategory(service)?.name }}
+                </span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Notes -->
+            <div v-if="selectedAppointment.notes" class="mt-4">
+              <div class="text-sm text-gray-500 mb-2">Notes</div>
+              <div class="text-gray-900 bg-white p-3 rounded border">{{ selectedAppointment.notes }}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Right Column - Pet History -->
+        <div class="space-y-6">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center gap-2">
+              <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Pet Medical History
+            </h3>
+            
+            <!-- Single Pet History -->
+            <div v-if="selectedAppointment.petName && !hasMultiplePets(selectedAppointment) && selectedAppointment.petId" class="space-y-4">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                  <img 
+                    v-if="selectedAppointment.petPhotoURL"
+                    :src="selectedAppointment.petPhotoURL" 
+                    :alt="selectedAppointment.petName"
+                    class="w-full h-full object-cover" 
+                    @error="onPetImageError"
+                  />
+                  <img 
+                    v-else
+                    :src="defaultPetPhotoURL" 
+                    :alt="selectedAppointment.petName"
+                    class="w-full h-full object-cover" 
+                  />
+                </div>
+                <div>
+                  <div class="font-medium text-gray-900">{{ selectedAppointment.petName }}</div>
+                  <div class="text-sm text-gray-500">Medical History</div>
+                </div>
+              </div>
+              
+              <!-- Pet History Content -->
+              <div class="bg-white rounded-lg border border-gray-200 p-4">
+                <div class="text-center py-8">
+                  <div class="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                  </div>
+                  <p class="text-gray-600 font-medium mb-2">View Complete Medical History</p>
+                  <p class="text-gray-500 text-sm mb-4">Access vaccination records, treatments, and medical notes</p>
+                  <button 
+                    @click="viewPetHistory(selectedAppointment)"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    Open Pet History
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Multiple Pets History -->
+            <div v-else-if="hasMultiplePets(selectedAppointment)" class="space-y-4">
+              <div class="text-sm text-gray-600 mb-3">
+                Medical history for {{ getPetCount(selectedAppointment) }} pets
+              </div>
+              
+              <div v-for="(pet, index) in getPetsArray(selectedAppointment)" :key="index" class="bg-white rounded-lg border border-gray-200 p-4">
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    <img 
+                      v-if="pet.photo"
+                      :src="pet.photo" 
+                      :alt="pet.name"
+                      class="w-full h-full object-cover" 
+                      @error="onPetImageError"
+                    />
+                    <img 
+                      v-else
+                      :src="defaultPetPhotoURL" 
+                      :alt="pet.name"
+                      class="w-full h-full object-cover" 
+                    />
+                  </div>
+                  <div>
+                    <div class="font-medium text-gray-900">{{ pet.name }}</div>
+                    <div class="text-sm text-gray-500">{{ pet.species || 'Unknown Species' }}</div>
+                  </div>
+                </div>
+                
+                <div class="text-center py-4">
+                  <button 
+                    v-if="pet.id"
+                    @click="viewPetHistoryById(pet.id)"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    View {{ pet.name }}'s History
+                  </button>
+                  <p v-else class="text-gray-500 text-sm">No history available</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- No Pet History -->
+            <div v-else class="bg-white rounded-lg border border-gray-200 p-4">
+              <div class="text-center py-8">
+                <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <PawPrintIcon class="w-8 h-8 text-gray-400" />
+                </div>
+                <p class="text-gray-600 font-medium mb-2">No Pet Information</p>
+                <p class="text-gray-500 text-sm">This appointment doesn't have associated pet data</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onBeforeUnmount, onActivated, onDeactivated, nextTick } from 'vue';
+import { ref, computed, onMounted, watch, onBeforeUnmount, onUnmounted, onActivated, onDeactivated, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { 
 Search as SearchIcon,
@@ -977,14 +2563,23 @@ PawPrint as PawPrintIcon,
 Stethoscope as StethoscopeIcon,
 CalendarDays as CalendarDaysIcon,
 Phone as PhoneIcon,
-MapPin as MapPinIcon
+MapPin as MapPinIcon,
+  Clock as ClockIcon,
+  CheckCircle as CheckCircleIcon
 } from 'lucide-vue-next';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import { useAppointmentStore } from '@/stores/modules/appointmentStore';
 import { useProfileStore } from '@/stores/modules/profileStore';
 import { usePetsStore } from '@/stores/modules/petsStore';
 import { useAuthStore } from '@/stores/modules/authStore';
+import { useNotificationsStore } from '@/stores/modules/notifications';
 import { parseISO, format } from 'date-fns';
+import notificationService from '@/services/notificationService';
+import smsService from '@/services/smsService';
+import { useServiceCategoryStore } from '@/stores/modules/ServiceCategoryStore'
+import { generateVaccinationRecordWithAutoScheduling, addVaccinationToPet } from '@/services/vaccinationService'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '@shared/firebase'
 
 // Router and route
 const router = useRouter();
@@ -1000,6 +2595,7 @@ const appointmentStore = useAppointmentStore();
 const profileStore = useProfileStore();
 const petsStore = usePetsStore();
 const authStore = useAuthStore();
+const notificationsStore = useNotificationsStore();
 
 // Modified headers array - changed clientName to ownerName
 const headers = [
@@ -1023,6 +2619,114 @@ const itemsPerPage = 10;
 const showFilters = ref(false);
 const filters = ref({
 status: '',
+dateRange: '',
+serviceType: ''
+});
+
+// Category filter state
+const categoryFilter = ref('all');
+
+// Service categories state
+const serviceCategories = ref({});
+const servicesData = ref({});
+const categoriesData = ref({});
+
+// Status category definitions (dedup by ID to avoid over-counting)
+const statusCategories = computed(() => {
+  // Build a unique set of appointments by ID from filtered appointments
+  const uniqueMap = new Map();
+  for (const appt of filteredAppointments.value) {
+    if (!appt || !appt.id) continue;
+    uniqueMap.set(appt.id, appt);
+  }
+  const unique = Array.from(uniqueMap.values());
+
+  // Count by effective status (expired is computed)
+  const counters = unique.reduce((acc, a) => {
+    let eff;
+    
+    if (isExpired(a)) {
+      eff = 'expired';
+    } else if (a.rescheduleRequest && a.rescheduleRequest.status === 'reschedule_requested') {
+      eff = 'reschedule_requested';
+    } else {
+      eff = (a.status || '').toLowerCase();
+    }
+    
+    const key = eff || 'pending';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const total = unique.length;
+  return [
+    { key: '', label: 'All', count: total },
+    { key: 'pending', label: 'Pending', count: counters['pending'] || 0 },
+    { key: 'approved', label: 'Approved', count: counters['approved'] || 0 },
+    { key: 'completed', label: 'Completed', count: counters['completed'] || 0 },
+    { key: 'rejected', label: 'Rejected', count: counters['rejected'] || 0 },
+    { key: 'cancelled', label: 'Cancelled', count: counters['cancelled'] || 0 },
+    { key: 'expired', label: 'Expired', count: counters['expired'] || 0 },
+            { key: 'reschedule_requested', label: 'Reschedule Requested', count: counters['reschedule_requested'] || 0 },
+  ];
+});
+
+// Available categories for filtering
+const availableCategories = computed(() => {
+  return Object.values(categoriesData.value).filter(category => !category.archived);
+});
+
+// Check if we're in reschedule reconsideration mode
+const isRescheduleMode = computed(() => {
+  return route.query.mode === 'reschedule';
+});
+
+// Filtered appointments based on status AND category (both filters work together)
+const filteredAppointments = computed(() => {
+  let filtered = appointments.value;
+  
+  // Apply status filter
+  if (filters.value.status) {
+    filtered = filtered.filter(appointment => {
+      // Handle expired appointments
+      if (isExpired(appointment)) {
+        return filters.value.status === 'expired';
+      }
+      
+      // Handle reschedule requests (new structure)
+      if (filters.value.status === 'reschedule_requested') {
+        return appointment.rescheduleRequest && 
+               appointment.rescheduleRequest.status === 'reschedule_requested';
+      }
+      
+      // For approved filter, exclude appointments with reschedule requests
+      if (filters.value.status === 'approved') {
+        // If appointment has a reschedule request, don't show it in approved filter
+        if (appointment.rescheduleRequest && appointment.rescheduleRequest.status === 'reschedule_requested') {
+          return false;
+        }
+        return appointment.status === 'approved';
+      }
+      
+      // Handle other statuses normally
+      return appointment.status === filters.value.status;
+    });
+  }
+  
+  // Apply category filter (this will further filter the already status-filtered results)
+  if (categoryFilter.value !== 'all') {
+    filtered = filtered.filter(appointment => {
+      if (!appointment.services || appointment.services.length === 0) return false;
+      
+      // Check if any service in this appointment belongs to the selected category
+      return appointment.services.some(serviceId => {
+        const service = servicesData.value[serviceId];
+        return service && service.categoryId === categoryFilter.value;
+      });
+    });
+  }
+  
+  return filtered;
 });
 
 // Loading states
@@ -1040,6 +2744,841 @@ const cancelLoading = ref(false);
 const showSuccessModal = ref(false);
 const successTitle = ref('');
 const successMessage = ref('');
+
+// Single action confirmation modal
+const showActionConfirmModal = ref(false);
+const actionTypeToConfirm = ref(''); // 'approve' | 'reject' | 'complete'
+const actionTargetId = ref(null);
+const actionLoading = ref(false);
+
+// Completion form modal state
+const showCompletionFormModal = ref(false);
+const completionFormLoading = ref(false);
+
+// Expanded appointment state
+const expandedAppointment = ref(null);
+
+// Pet selection for history state
+const selectedPetForHistory = ref({});
+
+// Timeline visibility state
+const showTimeline = ref({});
+const completionForm = ref({
+  services: [],
+  pets: [],
+  prescription: {
+    medications: [{
+      name: '',
+      dosage: '',
+      frequency: '',
+      duration: '',
+      instructions: ''
+    }],
+    dosage: '',
+    frequency: '',
+    duration: '',
+    instructions: '',
+    warnings: '',
+    followUpRequired: false,
+    followUpDate: ''
+  },
+  generalNotes: {
+    treatmentSummary: '',
+    ownerInstructions: '',
+    nextSteps: ''
+  }
+});
+
+const openActionConfirm = (type, appointmentId) => {
+  actionTypeToConfirm.value = type;
+  actionTargetId.value = appointmentId;
+  showActionConfirmModal.value = true;
+};
+
+const closeActionConfirm = () => {
+  if (actionLoading.value) return;
+  showActionConfirmModal.value = false;
+  actionTypeToConfirm.value = '';
+  actionTargetId.value = null;
+};
+
+const confirmAction = async () => {
+  if (!actionTypeToConfirm.value || !actionTargetId.value) return;
+  actionLoading.value = true;
+  try {
+    if (actionTypeToConfirm.value === 'approve') {
+      await approveAppointment(actionTargetId.value);
+    } else if (actionTypeToConfirm.value === 'reject') {
+      await rejectAppointment(actionTargetId.value);
+    } else if (actionTypeToConfirm.value === 'complete') {
+      // Open completion form instead of directly completing
+      await openCompletionForm(actionTargetId.value);
+    }
+    showActionConfirmModal.value = false;
+  } finally {
+    actionLoading.value = false;
+    actionTypeToConfirm.value = '';
+    actionTargetId.value = null;
+  }
+};
+
+// Open completion form for an appointment
+const openCompletionForm = async (appointmentId) => {
+  const appointment = appointments.value.find(a => a.id === appointmentId);
+  if (!appointment) return;
+  
+  console.log('Opening completion form for appointment:', appointment);
+  console.log('Appointment serviceNames:', appointment.serviceNames);
+  console.log('Available service data:', servicesData.value);
+  console.log('Available category data:', categoriesData.value);
+  console.log('Service categories mapping:', serviceCategories.value);
+  
+  selectedAppointment.value = appointment;
+  
+  // Initialize completion form with appointment data
+  completionForm.value = {
+    services: appointment.serviceNames?.map(service => ({
+      name: service,
+      status: 'completed',
+      duration: 30,
+      notes: '',
+      category: getServiceCategory(service) // Add category information
+    })) || [],
+    pets: getPetsArray(appointment).map(pet => ({
+      name: pet.name,
+      overallHealth: 'good',
+      weight: pet.weight || '',
+      healthNotes: '',
+      followUpRequired: false,
+      followUpNotes: ''
+    })),
+    prescription: {
+      medications: [{
+        name: '',
+        dosage: '',
+        frequency: '',
+        duration: '',
+        instructions: ''
+      }],
+      dosage: '',
+      frequency: '',
+      duration: '',
+      instructions: '',
+      warnings: '',
+      followUpRequired: false,
+      followUpDate: ''
+    },
+    generalNotes: {
+      treatmentSummary: '',
+      ownerInstructions: '',
+      nextSteps: ''
+    }
+  };
+  
+  showCompletionFormModal.value = true;
+};
+
+// Close completion form modal
+const closeCompletionFormModal = () => {
+  showCompletionFormModal.value = false;
+  selectedAppointment.value = null;
+  completionForm.value = {
+    services: [],
+    pets: [],
+    prescription: {
+      medications: [{
+        name: '',
+        dosage: '',
+        frequency: '',
+        duration: '',
+        instructions: ''
+      }],
+      dosage: '',
+      frequency: '',
+      duration: '',
+      instructions: '',
+      warnings: '',
+      followUpRequired: false,
+      followUpDate: ''
+    },
+    generalNotes: {
+      treatmentSummary: '',
+      ownerInstructions: '',
+      nextSteps: ''
+    }
+  };
+};
+
+// Medication management functions
+const addMedication = () => {
+  completionForm.value.prescription.medications.push({
+    name: '',
+    dosage: '',
+    frequency: '',
+    duration: '',
+    instructions: ''
+  });
+};
+
+const removeMedication = (index) => {
+  completionForm.value.prescription.medications.splice(index, 1);
+};
+
+// Computed property to check if prescription has data
+const hasPrescriptionData = computed(() => {
+  const prescription = completionForm.value.prescription;
+  return prescription.medications.some(med => med.name || med.dosage || med.frequency || med.duration || med.instructions) ||
+         prescription.instructions ||
+         prescription.warnings ||
+         prescription.followUpRequired;
+});
+
+// Print prescription function
+const printPrescription = () => {
+  if (!hasPrescriptionData.value) {
+    console.warn('No prescription data to print');
+    return;
+  }
+
+  try {
+    const prescriptionData = completionForm.value.prescription;
+    const appointmentInfo = {
+      petName: selectedAppointment.value?.petName || 'Unknown Pet',
+      doctorName: authStore.user?.displayName || 'Dr. Veterinarian',
+      date: selectedAppointment.value ? formatDate(selectedAppointment.value.date) : new Date().toLocaleDateString(),
+      time: selectedAppointment.value?.time || 'N/A',
+      serviceNames: selectedAppointment.value?.serviceNames?.join(', ') || 'Appointment'
+    };
+
+    // Generate print content
+    const printContent = generatePrescriptionPrintContent(prescriptionData, appointmentInfo);
+    
+    // Create new window for printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    
+    // Wait for content to load then print
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
+    
+    console.log('Prescription print initiated');
+  } catch (error) {
+    console.error('Error printing prescription:', error);
+  }
+};
+
+// Generate prescription print content
+const generatePrescriptionPrintContent = (prescriptionData, appointmentInfo) => {
+  const medications = prescriptionData.medications || [];
+  const instructions = prescriptionData.instructions || '';
+  const warnings = prescriptionData.warnings || '';
+  const followUpRequired = prescriptionData.followUpRequired || false;
+  const followUpDate = prescriptionData.followUpDate || '';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Prescription - ${appointmentInfo.petName}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .header { text-align: center; border-bottom: 3px solid #dc2626; padding-bottom: 20px; margin-bottom: 30px; }
+        .clinic-name { font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 10px; }
+        .prescription-title { font-size: 20px; font-weight: bold; color: #dc2626; margin-bottom: 20px; }
+        .appointment-info { background: #fef2f2; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .medication { background: #fef2f2; padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #dc2626; }
+        .medication-name { font-weight: bold; color: #dc2626; font-size: 16px; margin-bottom: 10px; }
+        .medication-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .instructions { background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .warnings { background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f59e0b; }
+        .followup { background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; }
+        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+        @media print { 
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="clinic-name">ProVet Veterinary Clinic</div>
+        <div class="prescription-title">🏥 PRESCRIPTION</div>
+    </div>
+
+    <div class="appointment-info">
+        <h3>Appointment Information</h3>
+        <p><strong>Pet:</strong> ${appointmentInfo.petName}</p>
+        <p><strong>Doctor:</strong> ${appointmentInfo.doctorName}</p>
+        <p><strong>Date:</strong> ${appointmentInfo.date}</p>
+        <p><strong>Time:</strong> ${appointmentInfo.time}</p>
+        <p><strong>Service:</strong> ${appointmentInfo.serviceNames}</p>
+    </div>
+
+    ${medications.length > 0 ? `
+    <h3>Prescribed Medications</h3>
+    ${medications.map((med, index) => `
+        <div class="medication">
+            <div class="medication-name">Medication ${index + 1}: ${med.name || 'Not specified'}</div>
+            <div class="medication-details">
+                ${med.dosage ? `<div><strong>Dosage:</strong> ${med.dosage}</div>` : ''}
+                ${med.frequency ? `<div><strong>Frequency:</strong> ${med.frequency}</div>` : ''}
+                ${med.duration ? `<div><strong>Duration:</strong> ${med.duration}</div>` : ''}
+            </div>
+            ${med.instructions ? `<div><strong>Special Instructions:</strong> ${med.instructions}</div>` : ''}
+        </div>
+    `).join('')}
+    ` : ''}
+
+    ${instructions ? `
+    <div class="instructions">
+        <h3>General Instructions</h3>
+        <p>${instructions}</p>
+    </div>
+    ` : ''}
+
+    ${warnings ? `
+    <div class="warnings">
+        <h3>⚠️ Warnings & Contraindications</h3>
+        <p>${warnings}</p>
+    </div>
+    ` : ''}
+
+    ${followUpRequired ? `
+    <div class="followup">
+        <h3>Follow-up Required</h3>
+        <p>This prescription requires follow-up monitoring.</p>
+        ${followUpDate ? `<p><strong>Follow-up Date:</strong> ${followUpDate}</p>` : ''}
+    </div>
+    ` : ''}
+
+    <div class="footer">
+        <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+        <p>ProVet Veterinary Clinic - Your trusted pet care partner</p>
+    </div>
+</body>
+</html>`;
+};
+
+// Submit completion form
+const submitCompletionForm = async () => {
+  if (!selectedAppointment.value) return;
+  
+  completionFormLoading.value = true;
+  try {
+    // Create completion data object
+    const completionData = {
+      appointmentId: selectedAppointment.value.id,
+      completedAt: new Date(),
+      completedBy: authStore.user?.uid,
+      services: completionForm.value.services,
+      pets: completionForm.value.pets,
+      prescription: completionForm.value.prescription,
+      generalNotes: completionForm.value.generalNotes,
+      status: 'completed'
+    };
+    
+    // Update appointment status and add completion data
+    await appointmentStore.updateAppointmentStatus(selectedAppointment.value.id, 'completed');
+    
+    // Store completion data in a separate collection or as part of the appointment
+    await storeCompletionData(completionData);
+    
+    // 🔧 NEW: Check if this appointment has vaccination services and generate vaccination records
+    let vaccinationProcessed = false;
+    try {
+      vaccinationProcessed = await processVaccinationAppointment(selectedAppointment.value, completionData);
+    } catch (vaccinationError) {
+      console.error('Error processing vaccination appointment:', vaccinationError);
+      // Don't fail the completion if vaccination processing fails
+    }
+    
+    // Send notification to the user about appointment completion
+    try {
+      await sendAppointmentNotification(selectedAppointment.value.id, 'complete', 'completed');
+      
+      // Send notification to the vet about their action
+      await sendVetNotification(selectedAppointment.value.id, 'complete', 'completed');
+      
+      // Send additional detailed completion notification with summary
+      await sendDetailedCompletionNotification(selectedAppointment.value.id, completionData);
+      
+
+    } catch (notificationError) {
+      console.error('Error sending completion notification:', notificationError);
+      // Don't fail the completion if notification fails
+    }
+    
+    // Show success message (only if vaccination processing didn't already show a message)
+    if (!vaccinationProcessed) {
+    successTitle.value = 'Appointment Completed';
+    successMessage.value = 'The appointment has been marked as completed with detailed notes.';
+    showSuccessModal.value = true;
+    }
+    
+    // Close modal and refresh data
+    closeCompletionFormModal();
+    await fetchAppointments();
+    
+  } catch (error) {
+    console.error('Error completing appointment:', error);
+    // Show error message
+    successTitle.value = 'Error';
+    successMessage.value = 'Failed to complete appointment. Please try again.';
+    showSuccessModal.value = true;
+  } finally {
+    completionFormLoading.value = false;
+  }
+};
+
+// Store completion data (you can modify this to store in your preferred location)
+const storeCompletionData = async (completionData) => {
+  try {
+    // For now, we'll store this in the appointment document itself
+    // You might want to create a separate 'appointment_completions' collection
+    const { doc, updateDoc } = await import('firebase/firestore');
+    const { db } = await import('@shared/firebase');
+    
+    const appointmentRef = doc(db, 'appointments', completionData.appointmentId);
+    await updateDoc(appointmentRef, {
+      status: 'completed',
+      completedAt: completionData.completedAt,
+      completedBy: completionData.completedBy,
+      completionData: {
+        services: completionData.services,
+        pets: completionData.pets,
+        prescription: completionData.prescription,
+        generalNotes: completionData.generalNotes
+      }
+    });
+  } catch (error) {
+    console.error('Error storing completion data:', error);
+    throw error;
+  }
+};
+
+// 🔧 NEW: Process vaccination appointments and generate autoscheduling suggestions
+const processVaccinationAppointment = async (appointment, completionData) => {
+  try {
+    console.log('🔍 Checking if appointment has vaccination services...');
+    console.log('🔍 Appointment data:', {
+      id: appointment.id,
+      servicesIds: appointment.servicesIds,
+      services: appointment.services,
+      serviceNames: appointment.serviceNames,
+      'Service Names': appointment['Service Names']
+    });
+    
+    // Get the appointment's services
+    const appointmentServices = appointment.servicesIds || appointment.services || [];
+    if (appointmentServices.length === 0) {
+      console.log('❌ No services found in appointment');
+      return false;
+    }
+    
+    console.log('🔍 Service IDs found:', appointmentServices);
+    console.log('🔍 Available services data:', Object.keys(servicesData.value));
+    
+    // Get service details to check if any are vaccination services
+    const serviceDetails = await fetchVaccinationServiceDetails(appointmentServices);
+    console.log('🔍 Service details fetched:', serviceDetails);
+    
+    const hasVaccinationServices = serviceDetails.some(service => {
+      const isVaccination = service.isVaccination === true ||
+      service.name?.toLowerCase().includes('vaccination') ||
+      service.name?.toLowerCase().includes('vaccine') ||
+        service.name?.toLowerCase().includes('shot');
+      
+      console.log(`🔍 Service "${service.name}": isVaccination=${service.isVaccination}, name check=${isVaccination}`);
+      return isVaccination;
+    });
+    
+    if (!hasVaccinationServices) {
+      console.log('❌ No vaccination services found in appointment');
+      console.log('🔍 Service details that were checked:', serviceDetails.map(s => ({
+        name: s.name,
+        isVaccination: s.isVaccination,
+        id: s.id
+      })));
+      return false;
+    }
+    
+    console.log('🩺 Vaccination services detected, processing...');
+    
+    // Get pet details
+    const petIds = appointment.petIds || [appointment.petId];
+    if (petIds.length === 0) {
+      console.log('❌ No pets found in appointment');
+      return false;
+    }
+    
+    console.log('🔍 Pet IDs found:', petIds);
+    
+    // Get user details
+    const userId = appointment.userId;
+    if (!userId) {
+      console.log('❌ No user ID found in appointment');
+      return false;
+    }
+    
+    console.log('🔍 User ID found:', userId);
+    
+    // Get user details for notification
+    let user = null;
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        user = { id: userId, ...userDoc.data() };
+        console.log('✅ Found user details:', user.firstName, user.lastName);
+      }
+    } catch (userError) {
+      console.error('Error fetching user details:', userError);
+      user = { id: userId }; // Fallback with just ID
+    }
+    
+    let vaccinationProcessed = false;
+    let autoScheduledCount = 0;
+    
+    // Process each pet
+    for (const petId of petIds) {
+      try {
+        // Get pet details
+        const petDoc = await getDoc(doc(db, 'pets', petId));
+        if (!petDoc.exists()) {
+          console.log(`❌ Pet ${petId} not found`);
+          continue;
+        }
+        
+        const pet = { id: petId, ...petDoc.data() };
+        console.log(`🩺 Processing vaccination for pet: ${pet.name}`);
+        console.log('🔍 Pet data:', {
+          id: pet.id,
+          name: pet.name,
+          species: pet.species,
+          ageYears: pet.ageYears,
+          ageMonths: pet.ageMonths,
+          ageWeeks: pet.ageWeeks
+        });
+        
+        // Generate vaccination record with autoscheduling
+        const result = await generateVaccinationRecordWithAutoScheduling(
+          appointment, 
+          pet, 
+          serviceDetails, 
+          user
+        );
+        
+        console.log('🔍 Vaccination processing result:', result);
+        
+        if (result.vaccinationRecord) {
+          // Add vaccination record to pet
+          await addVaccinationToPet(petId, result.vaccinationRecord);
+          console.log(`✅ Vaccination record added for pet ${pet.name || petId}`);
+          vaccinationProcessed = true;
+          
+          if (result.autoScheduled && result.newSuggestions.length > 0) {
+            console.log(`✅ Auto-scheduled ${result.newSuggestions.length} vaccination appointments`);
+            console.log('🎯 Created appointments:', result.newSuggestions);
+            autoScheduledCount += result.newSuggestions.length;
+          } else {
+            console.log('⚠️ No auto-scheduling occurred. Result:', {
+              autoScheduled: result.autoScheduled,
+              newSuggestions: result.newSuggestions,
+              error: result.error
+            });
+          }
+        } else {
+          console.log('❌ No vaccination record generated');
+        }
+        
+      } catch (petError) {
+        console.error(`Error processing pet ${petId}:`, petError);
+      }
+    }
+    
+    // Show success message about auto-scheduling if any appointments were created
+    if (vaccinationProcessed && autoScheduledCount > 0) {
+      successTitle.value = 'Vaccination Completed & Next Appointments Scheduled';
+      successMessage.value = `Vaccination completed successfully. ${autoScheduledCount} follow-up vaccination appointment(s) have been automatically scheduled and the pet owner has been notified.`;
+      showSuccessModal.value = true;
+      return true; // Indicate that we showed a vaccination-specific message
+    } else if (vaccinationProcessed) {
+      console.log('✅ Vaccination processed but no auto-scheduling occurred');
+      successTitle.value = 'Vaccination Completed';
+      successMessage.value = 'Vaccination completed successfully. No follow-up appointments were needed at this time.';
+      showSuccessModal.value = true;
+      return true;
+    }
+    
+    return vaccinationProcessed; // Return true if vaccinations were processed, false otherwise
+    
+  } catch (error) {
+    console.error('Error processing vaccination appointment:', error);
+    throw error;
+  }
+};
+
+// Helper function to fetch service details for vaccination processing
+const fetchVaccinationServiceDetails = async (serviceIds) => {
+  try {
+    const serviceDetails = [];
+    for (const serviceId of serviceIds) {
+      if (servicesData.value[serviceId]) {
+        serviceDetails.push(servicesData.value[serviceId]);
+      }
+    }
+    console.log('🔍 Fetched service details:', serviceDetails.map(s => ({
+      id: s.id,
+      name: s.name,
+      isVaccination: s.isVaccination,
+      nextDoseIn: s.nextDoseIn,
+      nextDoseUnit: s.nextDoseUnit,
+      autoSchedule: s.autoSchedule
+    })));
+    return serviceDetails;
+  } catch (error) {
+    console.error('Error fetching service details:', error);
+    return [];
+  }
+};
+
+// Debug function to test auto-scheduling (can be called from browser console)
+const debugVaccinationAutoScheduling = async () => {
+  try {
+    console.log('🔧 Debugging vaccination auto-scheduling...');
+    console.log('🔧 Services data loaded:', Object.keys(servicesData.value).length);
+    console.log('🔧 Vaccination services:', Object.values(servicesData.value).filter(s => s.isVaccination).map(s => ({
+      id: s.id,
+      name: s.name,
+      nextDoseIn: s.nextDoseIn,
+      nextDoseUnit: s.nextDoseUnit,
+      autoSchedule: s.autoSchedule
+    })));
+    
+    // Test with a sample vaccination service
+    const vaccinationServices = Object.values(servicesData.value).filter(s => s.isVaccination);
+    if (vaccinationServices.length > 0) {
+      const testService = vaccinationServices[0];
+      console.log('🔧 Test service found:', testService);
+      
+      // Create a mock appointment
+      const mockAppointment = {
+        id: 'debug_test_appointment',
+        servicesIds: [testService.id],
+        serviceNames: [testService.name],
+        petIds: ['debug_pet_id'],
+        userId: 'debug_user_id',
+        doctorName: 'Debug Vet',
+        completedAt: new Date()
+      };
+      
+      const mockPet = {
+        id: 'debug_pet_id',
+        name: 'Debug Pet',
+        species: 'Dog'
+      };
+      
+      const mockUser = {
+        id: 'debug_user_id',
+        firstName: 'Debug',
+        lastName: 'User'
+      };
+      
+      console.log('🔧 Testing with mock data:', { mockAppointment, mockPet, mockUser });
+      
+      // Test the vaccination processing
+      const result = await processVaccinationAppointment(mockAppointment, {});
+      console.log('🔧 Test result:', result);
+      
+      return result;
+    } else {
+      console.log('❌ No vaccination services found in servicesData');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    return false;
+  }
+};
+
+// Make debug function available globally for testing
+window.debugVaccinationAutoScheduling = debugVaccinationAutoScheduling;
+
+// 🔧 NEW: Handle appointment ID from query parameter when redirected from queue
+const handleAppointmentFromQuery = async () => {
+  try {
+    // Check if there's an appointment ID in the query parameter
+    const appointmentId = route.query.id;
+    const mode = route.query.mode;
+    
+    if (!appointmentId) {
+      console.log('No appointment ID in query parameters');
+      return;
+    }
+    
+    console.log('🔍 Found appointment ID in query:', appointmentId);
+    console.log('🔍 Mode:', mode);
+    console.log('🔍 Current route query:', route.query);
+    console.log('🔍 Current route path:', route.path);
+    
+    // Wait for appointments to be loaded with retry logic
+    let retryCount = 0;
+    const maxRetries = 10;
+    
+    while (appointments.value.length === 0 && retryCount < maxRetries) {
+      console.log(`Appointments not loaded yet, waiting... (attempt ${retryCount + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+      retryCount++;
+    }
+    
+    if (appointments.value.length === 0) {
+      console.log('❌ Appointments still not loaded after retries');
+      return;
+    }
+    
+    console.log('🔍 Appointments loaded, count:', appointments.value.length);
+    console.log('🔍 Available appointment IDs:', appointments.value.map(a => a.id));
+    
+    // Find the specific appointment
+    const targetAppointment = appointments.value.find(appt => appt.id === appointmentId);
+    
+    if (!targetAppointment) {
+      console.log('❌ Appointment not found:', appointmentId);
+      console.log('🔍 First few appointments:', appointments.value.slice(0, 3).map(a => ({ id: a.id, ownerName: a.ownerName, petName: a.petName })));
+      return;
+    }
+    
+    console.log('✅ Found target appointment:', targetAppointment.ownerName, targetAppointment.petName);
+    
+    // Auto-filter to show only this appointment's status
+    if (targetAppointment.status) {
+      filters.value.status = targetAppointment.status;
+      console.log('🔧 Auto-filtered to status:', targetAppointment.status);
+    }
+    
+    // Auto-filter to show only this appointment's service category
+    if (targetAppointment.serviceCategoryId) {
+      categoryFilter.value = targetAppointment.serviceCategoryId;
+      console.log('🔧 Auto-filtered to category:', targetAppointment.serviceCategoryId);
+    }
+    
+    // Wait for DOM to be updated and then scroll to the appointment
+    await nextTick();
+    // Add a small delay to ensure DOM is fully rendered
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    console.log('🔍 About to scroll to appointment:', appointmentId);
+    scrollToAppointment(appointmentId);
+    
+    // Show a notification that the appointment was found
+    showAppointmentFoundNotification(targetAppointment);
+    
+  } catch (error) {
+    console.error('Error handling appointment from query:', error);
+  }
+};
+
+// 🔧 NEW: Scroll to specific appointment in the table
+const scrollToAppointment = (appointmentId) => {
+  try {
+    console.log('🔍 Looking for appointment element with data-appointment-id:', appointmentId);
+    
+    // Find the appointment row element
+    const appointmentRow = document.querySelector(`[data-appointment-id="${appointmentId}"]`);
+    
+    if (appointmentRow) {
+      console.log('✅ Found appointment row element:', appointmentRow);
+      
+      // Scroll to the appointment row
+      appointmentRow.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+      
+      // Add highlight effect
+      appointmentRow.classList.add('highlight-appointment');
+      console.log('🎨 Added highlight class to appointment row');
+      
+      // Remove highlight after 3 seconds
+      setTimeout(() => {
+        appointmentRow.classList.remove('highlight-appointment');
+        console.log('🎨 Removed highlight class from appointment row');
+      }, 3000);
+      
+      console.log('✅ Scrolled to appointment:', appointmentId);
+    } else {
+      console.log('❌ Appointment row element not found in DOM');
+      console.log('🔍 Available data-appointment-id elements:', 
+        Array.from(document.querySelectorAll('[data-appointment-id]')).map(el => el.getAttribute('data-appointment-id'))
+      );
+    }
+  } catch (error) {
+    console.error('Error scrolling to appointment:', error);
+  }
+};
+
+// 🔧 NEW: Show notification that appointment was found
+const showAppointmentFoundNotification = (appointment) => {
+  try {
+    // Create a temporary notification
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 translate-x-full';
+    notification.innerHTML = `
+      <div class="flex items-center gap-3">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div>
+          <div class="font-medium">Appointment Found!</div>
+          <div class="text-sm opacity-90">${appointment.ownerName} - ${appointment.petName}</div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+      notification.classList.remove('translate-x-full');
+    }, 100);
+    
+    // Remove after 4 seconds
+    setTimeout(() => {
+      notification.classList.add('translate-x-full');
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 4000);
+    
+  } catch (error) {
+    console.error('Error showing notification:', error);
+  }
+};
+
+// Legacy completeAppointment function (for backward compatibility)
+// const completeAppointment = async (appointmentId) => {
+//   try {
+//     await appointmentStore.updateAppointmentStatus(appointmentId, 'completed');
+    
+//     // Show success message
+//     successTitle.value = 'Appointment Completed';
+//     successMessage.value = 'The appointment has been marked as completed.';
+//     showSuccessModal.value = true;
+    
+//     // Refresh appointments
+//     await fetchAppointments();
+//   } catch (error) {
+//     console.error('Error completing appointment:', error);
+//     successTitle.value = 'Error';
+//     successMessage.value = 'Failed to complete appointment. Please try again.';
+//     showSuccessModal.value = true;
+//   }
+// };
 
 // Action type tracking
 const pendingAction = ref(null);
@@ -1079,6 +3618,36 @@ const approvalSteps = [
   description: 'Review and confirm approval'
 }
 ];
+
+
+
+// Bulk actions state
+const selectedAppointments = ref(new Set());
+const showBulkActions = ref(false);
+const bulkActionLoading = ref(false);
+const showBulkActionModal = ref(false);
+const bulkActionType = ref(''); // 'approve' or 'reject'
+const bulkActionReason = ref('');
+const bulkActionError = ref('');
+
+// Auto-Reschedule state
+const showAutoReschedulePanel = ref(false);
+const reschedulingAppointment = ref(null);
+const autoRescheduleLoading = ref(false);
+const vetSchedule = ref(null);
+const serviceDetails = ref([]);
+const futureAppointments = ref([]);
+const autoRescheduleOptions = ref([]);
+const selectedAutoOption = ref('');
+const selectedAutoRescheduleDate = ref('');
+const selectedAutoRescheduleTime = ref('');
+const selectedTimePeriod = ref('AM');
+const selectedDate = ref('');
+const showDatePicker = ref(false);
+const rescheduleReason = ref('');
+const currentMonth = ref(new Date());
+const tempSelectedDate = ref('');
+const showAppointmentDetailsModal = ref(false);
 
 // Pet medical history
 const petMedicalHistory = ref([]);
@@ -1268,7 +3837,7 @@ try {
     
     // Prepare to fetch owner information
     if (appointment.userId && appointment.userId !== 'guest-user') {
-      const ownerPromise = profileStore.fetchUserProfile(appointment.userId)
+      const ownerPromise = profileStore.fetchOtherUserProfile(appointment.userId)
         .then(userProfile => {
           if (userProfile) {
             // Update the appointment with owner information
@@ -1444,8 +4013,24 @@ try {
 };
 
 // Initialize component
-onMounted(() => {
-fetchAppointments();
+onMounted(async () => {
+  try {
+  await fetchServiceData(); // Fetch service categories and services
+  await fetchAppointments();
+  } catch (error) {
+    console.error('Error during initialization:', error);
+    // Still try to fetch appointments even if service data fails
+    try {
+      await fetchAppointments();
+    } catch (appointmentError) {
+      console.error('Failed to fetch appointments:', appointmentError);
+    }
+  }
+  
+  // 🔧 NEW: Also handle query parameters on mount as fallback
+  await handleAppointmentFromQuery();
+  
+  // Action menu functionality removed - no action menus implemented in this component
 });
 
 // Clean up when component is unmounted
@@ -1454,12 +4039,21 @@ onBeforeUnmount(() => {
 resetProcessingStates();
 });
 
+// Clean up when component is unmounted
+onUnmounted(() => {
+// Clean up any event listeners or resources
+});
+
 // Handle Vue keep-alive activation/deactivation
 onActivated(() => {
+console.log('🔄 Component activated - onActivated hook called');
 // When the component is activated (comes back into view)
 // Reset any processing states and refresh data
 resetProcessingStates();
 fetchAppointments(); // Always fetch fresh data when coming back to this view
+// Also handle query parameters when coming back to the page
+console.log('🔄 Calling handleAppointmentFromQuery from onActivated');
+handleAppointmentFromQuery();
 });
 
 onDeactivated(() => {
@@ -1500,6 +4094,19 @@ const toggleFilters = () => {
 showFilters.value = !showFilters.value;
 };
 
+// Manual refresh handler
+const handleRefresh = async () => {
+  if (isLoading.value) return;
+  isLoading.value = true;
+  try {
+    await fetchAppointments();
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+
+
 // Status filter functions
 const toggleStatusFilter = (status) => {
 if (status === 'All') {
@@ -1509,12 +4116,44 @@ if (status === 'All') {
 }
 showFilters.value = false;
 currentPage.value = 1;
+// Don't reset category filter - let them work together
 };
 
-const clearStatusFilter = () => {
-filters.value.status = '';
-currentPage.value = 1;
+
+
+// Category filter functions
+const setCategoryFilter = () => {
+  currentPage.value = 1;
+  // Don't reset status filter - let them work together
 };
+
+// Helper function to get category name by ID
+const getCategoryName = (categoryId) => {
+  if (categoryId === 'all') return 'All Categories';
+  const category = categoriesData.value[categoryId];
+  return category ? category.name : 'Unknown Category';
+};
+
+// Clear all filters function - clears both status and category filters
+const clearAllFilters = () => {
+  filters.value.status = '';
+  categoryFilter.value = 'all';
+  currentPage.value = 1;
+};
+
+// Clear only status filter - keeps category filter active
+const clearStatusFilterOnly = () => {
+  filters.value.status = '';
+  currentPage.value = 1;
+};
+
+// Clear only category filter - keeps status filter active
+const clearCategoryFilterOnly = () => {
+  categoryFilter.value = 'all';
+  currentPage.value = 1;
+};
+
+
 
 // Modified formatPetDetails function to only show breed and year
 const formatPetDetails = (appointment) => {
@@ -1554,6 +4193,8 @@ return gender;
 const formatDate = (dateString) => {
 if (!dateString) return 'N/A';
 
+console.log('formatDate input:', dateString, typeof dateString);
+
 let date;
 if (typeof dateString === 'string') {
   // Handle ISO string
@@ -1565,8 +4206,11 @@ if (typeof dateString === 'string') {
   return 'Invalid date';
 }
 
+console.log('formatDate parsed date:', date);
 const options = { year: 'numeric', month: 'long', day: 'numeric' };
-return date.toLocaleDateString(undefined, options);
+const result = date.toLocaleDateString(undefined, options);
+console.log('formatDate result:', result);
+return result;
 };
 
 const formatDateTime = (dateString) => {
@@ -1589,8 +4233,76 @@ return format(date, 'MMM d, yyyy h:mm a');
 const formatStatus = (status) => {
 if (!status) return 'Unknown';
 
+// Handle special status formatting
+if (status === 'reschedule_requested') {
+  return 'Reschedule Requested';
+}
+
 // Capitalize first letter
 return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+};
+
+// Check if appointment is expired (past scheduled time and not approved)
+const isExpired = (appointment) => {
+  if (appointment.status === 'approved' || appointment.status === 'completed' || appointment.status === 'cancelled' || 
+      (appointment.rescheduleRequest && appointment.rescheduleRequest.status === 'reschedule_requested')) {
+    return false;
+  }
+  
+  const appointmentDate = new Date(appointment.date);
+  const appointmentTime = appointment.time;
+  
+  // Parse appointment time range (e.g., "10:10 AM - 11:20 AM")
+  const timeRangeMatch = appointmentTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  
+  if (timeRangeMatch) {
+    // Parse start time
+    let startHour = parseInt(timeRangeMatch[1]);
+    const startMinute = parseInt(timeRangeMatch[2]);
+    const startPeriod = timeRangeMatch[3].toUpperCase();
+    
+    // Parse end time
+    let endHour = parseInt(timeRangeMatch[4]);
+    const endMinute = parseInt(timeRangeMatch[5]);
+    const endPeriod = timeRangeMatch[6].toUpperCase();
+    
+    // Convert start time to 24-hour format
+    if (startPeriod === 'PM' && startHour !== 12) startHour += 12;
+    if (startPeriod === 'AM' && startHour === 12) startHour = 0;
+    
+    // Convert end time to 24-hour format
+    if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
+    if (endPeriod === 'AM' && endHour === 12) endHour = 0;
+    
+    // Set appointment end time (use end time to determine if expired)
+    const appointmentEndDate = new Date(appointmentDate);
+    appointmentEndDate.setHours(endHour, endMinute, 0, 0);
+    
+    // Check if appointment end time has passed
+    const now = new Date();
+    return appointmentEndDate < now;
+  }
+  
+  // Fallback for single time format (e.g., "10:10 AM")
+  const singleTimeMatch = appointmentTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (singleTimeMatch) {
+    let hour = parseInt(singleTimeMatch[1]);
+    const minute = parseInt(singleTimeMatch[2]);
+    const period = singleTimeMatch[3].toUpperCase();
+  
+  // Convert to 24-hour format
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  
+  // Set appointment time
+  appointmentDate.setHours(hour, minute, 0, 0);
+  
+  // Check if appointment time has passed
+  const now = new Date();
+  return appointmentDate < now;
+  }
+  
+  return false;
 };
 
 const sortBy = (key) => {
@@ -1632,9 +4344,9 @@ const filteredAndSortedAppointments = computed(() => {
 // Create a Map to store unique appointments by ID
 const uniqueAppointments = new Map();
 
-// Process each appointment
-appointments.value.forEach(appointment => {
-  // Check if it matches the search and filter criteria
+// Process each appointment from the filtered appointments
+filteredAppointments.value.forEach(appointment => {
+  // Check if it matches the search criteria
   const matchesSearch =
     (appointment.ownerName?.toLowerCase() || '').includes(search.value.toLowerCase()) ||
     (appointment.ownerEmail?.toLowerCase() || '').includes(search.value.toLowerCase()) ||
@@ -1642,10 +4354,8 @@ appointments.value.forEach(appointment => {
     (appointment.petSpecies?.toLowerCase() || '').includes(search.value.toLowerCase()) ||
     (appointment.contactInformation?.toLowerCase() || '').includes(search.value.toLowerCase());
 
-  const matchesStatus = filters.value.status === '' || appointment.status === filters.value.status;
-
-  // Only add to the map if it matches criteria and isn't already there
-  if (matchesSearch && matchesStatus) {
+  // Only add to the map if it matches search criteria and isn't already there
+  if (matchesSearch) {
     uniqueAppointments.set(appointment.id, appointment);
   }
 });
@@ -1738,8 +4448,12 @@ switch (status?.toLowerCase()) {
   case 'cancelled':
   case 'rejected':
     return `${baseClasses} bg-red-100 text-red-800`;
+  case 'expired':
+    return `${baseClasses} bg-red-50 text-red-700 border border-red-200`;
   case 'ended':
     return `${baseClasses} bg-slate-200 text-slate-700`;
+    case 'reschedule_requested':
+      return `${baseClasses} bg-orange-100 text-orange-800`;
   default:
     return `${baseClasses} bg-gray-100 text-gray-800`;
 }
@@ -1762,7 +4476,7 @@ try {
   // Fetch complete owner data if needed
   let ownerData = {};
   if (appointment.userId && appointment.userId !== 'guest-user') {
-    const ownerPromise = profileStore.fetchUserProfile(appointment.userId)
+    const ownerPromise = profileStore.fetchOtherUserProfile(appointment.userId)
       .then(userProfile => {
         if (userProfile) {
           ownerData = {
@@ -2133,6 +4847,12 @@ try {
   // Remove from original statuses tracking
   delete originalStatuses.value[selectedAppointment.value.id];
   
+  // Send notification to the user
+  await sendAppointmentNotification(selectedAppointment.value.id, 'cancel', 'cancelled');
+    
+    // Send notification to the vet about their action
+    await sendVetNotification(selectedAppointment.value.id, 'cancel', 'cancelled');
+  
   // Close the modal
   showCancelModal.value = false;
   selectedAppointment.value = null;
@@ -2198,6 +4918,12 @@ try {
   // Remove from original statuses tracking
   delete originalStatuses.value[selectedAppointment.value.id];
   
+  // Send notification to the user
+  await sendAppointmentNotification(selectedAppointment.value.id, 'approve', 'approved');
+  
+  // Send notification to the vet about their action
+  await sendVetNotification(selectedAppointment.value.id, 'approve', 'approved');
+  
   // Close the approval form
   showApprovalForm.value = false;
   
@@ -2216,6 +4942,130 @@ const closeSuccessModal = () => {
 showSuccessModal.value = false;
 successTitle.value = '';
 successMessage.value = '';
+};
+
+// Bulk selection functions
+const isAllSelected = computed(() => {
+return paginatedAppointments.value.length > 0 && 
+       paginatedAppointments.value.every(appt => selectedAppointments.value.has(appt.id));
+});
+
+const toggleAllSelection = () => {
+if (isAllSelected.value) {
+  selectedAppointments.value.clear();
+} else {
+  paginatedAppointments.value.forEach(appt => {
+    selectedAppointments.value.add(appt.id);
+  });
+}
+};
+
+const toggleAppointmentSelection = (appointmentId) => {
+if (selectedAppointments.value.has(appointmentId)) {
+  selectedAppointments.value.delete(appointmentId);
+} else {
+  selectedAppointments.value.add(appointmentId);
+}
+};
+
+const clearSelection = () => {
+selectedAppointments.value.clear();
+};
+
+
+
+// Bulk action functions
+const closeBulkActionModal = () => {
+showBulkActionModal.value = false;
+bulkActionType.value = '';
+bulkActionReason.value = '';
+bulkActionError.value = '';
+};
+
+const executeBulkAction = async () => {
+if (bulkActionType.value === 'reject' && !bulkActionReason.value.trim()) {
+  bulkActionError.value = 'Please provide a reason for rejection';
+  return;
+}
+
+bulkActionLoading.value = true;
+
+try {
+  const selectedIds = Array.from(selectedAppointments.value);
+  const promises = [];
+  
+  for (const appointmentId of selectedIds) {
+    if (bulkActionType.value === 'approve') {
+      promises.push(
+        appointmentStore.updateAppointment(appointmentId, {
+          status: 'approved',
+          approvedBy: 'vet',
+          approvedAt: new Date(),
+          updatedAt: new Date()
+        })
+      );
+    } else if (bulkActionType.value === 'reject') {
+      promises.push(
+        appointmentStore.updateAppointment(appointmentId, {
+          status: 'cancelled',
+          cancellationReason: bulkActionReason.value.trim(),
+          cancelledBy: 'vet',
+          cancelledAt: new Date(),
+          updatedAt: new Date()
+        })
+      );
+    }
+  }
+  
+  await Promise.all(promises);
+  
+  // Update local state
+  selectedIds.forEach(appointmentId => {
+    const index = appointments.value.findIndex(a => a.id === appointmentId);
+    if (index !== -1) {
+      if (bulkActionType.value === 'approve') {
+        appointments.value[index].status = 'approved';
+        appointments.value[index].approvedBy = 'vet';
+        appointments.value[index].approvedAt = new Date();
+        appointments.value[index].updatedAt = new Date();
+      } else if (bulkActionType.value === 'reject') {
+        appointments.value[index].status = 'cancelled';
+        appointments.value[index].cancellationReason = bulkActionReason.value.trim();
+        appointments.value[index].cancelledBy = 'vet';
+        appointments.value[index].cancelledAt = new Date();
+        appointments.value[index].updatedAt = new Date();
+      }
+    }
+  });
+  
+  // Send notifications for each appointment
+  const notificationPromises = selectedIds.map(appointmentId => {
+    const action = bulkActionType.value === 'approve' ? 'approve' : 'reject';
+    const status = bulkActionType.value === 'approve' ? 'approved' : 'rejected';
+    return Promise.all([
+      sendAppointmentNotification(appointmentId, action, status),
+      sendVetNotification(appointmentId, action, status)
+    ]);
+  });
+  
+  // Wait for all notifications to be sent
+  await Promise.all(notificationPromises);
+  
+  // Clear selection and close modal
+  selectedAppointments.value.clear();
+  closeBulkActionModal();
+  
+  // Show success message
+  successTitle.value = bulkActionType.value === 'approve' ? 'Appointments Approved' : 'Appointments Rejected';
+  successMessage.value = `${selectedIds.length} appointment${selectedIds.length > 1 ? 's' : ''} have been ${bulkActionType.value === 'approve' ? 'approved' : 'rejected'} successfully.`;
+  showSuccessModal.value = true;
+  
+} catch (error) {
+  console.error('Error executing bulk action:', error);
+  bulkActionError.value = 'An error occurred while processing the appointments.';
+} finally {
+  bulkActionLoading.value = false;
+}
 };
 
 const exportToCSV = () => {
@@ -2297,7 +5147,7 @@ setTimeout(() => {
         formatPetDetails(appointment),
         formatDate(appointment.date),
         appointment.time,
-        appointment.serviceNames?.join('; ') || '',
+        appointment.services?.map(serviceId => getServiceDisplayName(serviceId)).join('; ') || '',
         appointment.status,
         appointment.cancellationReason || '',
         appointment.cancelledBy || '',
@@ -2320,6 +5170,1644 @@ setTimeout(() => {
 // Ensure useRoute and useRouter are called unconditionally
 const currentRoute = useRoute();
 const vueRouter = useRouter();
+
+// Reschedule request functions
+const openRescheduleRequestPanel = async (appointment) => {
+  reschedulingAppointment.value = { ...appointment };
+  showAutoReschedulePanel.value = true;
+  
+  // Reset form
+  selectedAutoOption.value = '';
+  selectedAutoRescheduleDate.value = '';
+  selectedAutoRescheduleTime.value = '';
+  selectedTimePeriod.value = 'AM';
+  selectedDate.value = '';
+  tempSelectedDate.value = '';
+  currentMonth.value = new Date();
+  rescheduleReason.value = '';
+  
+  // Fetch required data
+  await Promise.all([
+    fetchVetSchedule(),
+    fetchServiceDetails(appointment.services || []),
+    fetchFutureAppointments()
+  ]);
+};
+
+// Open cancel modal for an approved appointment directly from card
+const openCancelModal = (appointment) => {
+  selectedAppointment.value = { ...appointment };
+  cancellationReason.value = '';
+  reasonError.value = '';
+  showCancelModal.value = true;
+};
+
+const closeAutoReschedulePanel = () => {
+  showAutoReschedulePanel.value = false;
+  reschedulingAppointment.value = null;
+  vetSchedule.value = null;
+  serviceDetails.value = [];
+  futureAppointments.value = [];
+  autoRescheduleOptions.value = [];
+  selectedAutoOption.value = '';
+  selectedAutoRescheduleDate.value = '';
+  selectedAutoRescheduleTime.value = '';
+  selectedDate.value = '';
+  showDatePicker.value = false;
+  tempSelectedDate.value = '';
+  currentMonth.value = new Date();
+  rescheduleReason.value = '';
+};
+
+
+
+
+
+// ========================================
+// CALENDAR HELPER FUNCTIONS
+// ========================================
+
+const isWorkingDay = (date) => {
+  const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const schedule = vetSchedule.value?.schedule || '';
+  
+  if (schedule.includes('Mon-Fri')) {
+    return dayOfWeek >= 1 && dayOfWeek <= 5;
+  } else if (schedule.includes('Mon-Sat')) {
+    return dayOfWeek >= 1 && dayOfWeek <= 6;
+  }
+  
+  return true; // Default to working day if no schedule specified
+};
+
+const previousMonth = () => {
+  currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() - 1, 1);
+};
+
+const nextMonth = () => {
+  currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() + 1, 1);
+};
+
+const selectCalendarDate = (day) => {
+  if (day.isPast || !day.isWorkingDay) return;
+  
+  console.log('Selected calendar day:', day);
+  console.log('Day date:', day.date);
+  tempSelectedDate.value = day.date;
+};
+
+const confirmDateSelection = () => {
+  if (tempSelectedDate.value) {
+    console.log('Confirming date selection:', tempSelectedDate.value);
+    selectedDate.value = tempSelectedDate.value;
+    selectedAutoOption.value = '';
+    selectedAutoRescheduleTime.value = '';
+    
+    // Generate time options for selected date
+    generateTimeOptionsForDate(tempSelectedDate.value);
+    
+    // Close the date picker
+    showDatePicker.value = false;
+    tempSelectedDate.value = '';
+  }
+};
+
+// ========================================
+// EXPANDABLE APPOINTMENT DETAILS FUNCTIONS
+// ========================================
+
+const toggleAppointmentDetails = (appointmentId) => {
+  if (expandedAppointment.value === appointmentId) {
+    expandedAppointment.value = null;
+  } else {
+    expandedAppointment.value = appointmentId;
+  }
+};
+
+const selectPetForHistory = (appointmentId, petIdOrName) => {
+  selectedPetForHistory.value[appointmentId] = petIdOrName;
+};
+
+const toggleTimeline = (appointmentId) => {
+  showTimeline.value[appointmentId] = !showTimeline.value[appointmentId];
+};
+
+// ========================================
+// PET NAME HELPER FUNCTIONS
+// ========================================
+
+const getPetDisplayName = (appointment) => {
+  // Check if we have petNames array (multiple pets)
+  if (appointment.petNames && Array.isArray(appointment.petNames) && appointment.petNames.length > 0) {
+    return appointment.petNames.join(', ');
+  }
+  
+  // Check if we have petName (single pet)
+  if (appointment.petName && appointment.petName.trim()) {
+    return appointment.petName.trim();
+  }
+  
+  // Fallback
+  return 'No pet info';
+};
+
+// ========================================
+// PET HISTORY FUNCTIONS
+// ========================================
+
+const getPetHistory = (petIdOrName) => {
+  // This function should fetch pet history from appointments
+  // For now, we'll return a filtered list of appointments for this pet
+  if (!petIdOrName) return [];
+  
+  // Use a Set to track unique appointment IDs to prevent duplicates
+  const uniqueAppointmentIds = new Set();
+  
+  const filteredAppointments = appointments.value.filter(appointment => {
+    // Skip if we've already included this appointment
+    if (uniqueAppointmentIds.has(appointment.id)) return false;
+    
+    // Only include completed appointments for history
+    if (appointment.status !== 'completed') return false;
+    
+    // Check if this appointment involves the pet
+    let isPetInvolved = false;
+    
+    // Check by petId
+    if (appointment.petId === petIdOrName) {
+      isPetInvolved = true;
+    }
+    // Check by petName
+    else if (appointment.petName === petIdOrName) {
+      isPetInvolved = true;
+    }
+    // Check by petIds array
+    else if (appointment.petIds && appointment.petIds.includes(petIdOrName)) {
+      isPetInvolved = true;
+    }
+    // Check by petNames array (for multiple pets)
+    else if (appointment.petNames && Array.isArray(appointment.petNames)) {
+      if (appointment.petNames.some(name => name === petIdOrName)) {
+        isPetInvolved = true;
+      }
+    }
+    
+    // If pet is involved, add to unique set and include in results
+    if (isPetInvolved) {
+      uniqueAppointmentIds.add(appointment.id);
+      return true;
+    }
+    
+    return false;
+  });
+  
+  // Sort by date, newest first
+  return filteredAppointments.sort((a, b) => {
+    const dateA = a.date?.toDate?.() || new Date(a.date);
+    const dateB = b.date?.toDate?.() || new Date(b.date);
+    return dateB - dateA;
+  });
+};
+
+const viewAppointmentSummary = (appointment) => {
+  // This function can be used to view appointment completion details
+  // For now, we'll just log it - you can expand this later
+  console.log('Viewing appointment summary:', appointment);
+  // You could open a modal or navigate to a details page here
+};
+
+// ========================================
+// PET HISTORY FUNCTIONS
+// ========================================
+
+const viewPetHistory = (appointment) => {
+  // For single pet appointments
+  if (appointment.petId) {
+    router.push(`/vet/pets/${appointment.petId}/history`);
+  } else if (appointment.petIds && appointment.petIds.length > 0) {
+    // For multiple pets, navigate to the first pet's history
+    router.push(`/vet/pets/${appointment.petIds[0]}/history`);
+  }
+};
+
+const viewPetHistoryById = (petId) => {
+  router.push(`/vet/pets/${petId}/history`);
+};
+
+// ========================================
+// DATA FETCHING FUNCTIONS
+// ========================================
+
+const fetchVetSchedule = async () => {
+  try {
+    const currentVetId = authStore.user?.userId;
+    if (!currentVetId) return;
+    
+    // Import Firestore functions
+    const { doc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('@shared/firebase');
+    
+    const userDocRef = doc(db, 'users', currentVetId);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (userDoc.exists()) {
+      vetSchedule.value = userDoc.data();
+    }
+  } catch (error) {
+    console.error('Error fetching vet schedule:', error);
+  }
+};
+
+const fetchServiceDetails = async (serviceIds) => {
+  try {
+    // Import Firestore functions
+    const { collection, doc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('@shared/firebase');
+    
+    const servicesRef = collection(db, 'services');
+    const servicePromises = serviceIds.map(async (serviceId) => {
+      console.log('Looking for service ID:', serviceId);
+      
+      const serviceDocRef = doc(servicesRef, serviceId);
+      const serviceDoc = await getDoc(serviceDocRef);
+      
+      if (serviceDoc.exists()) {
+        const serviceData = serviceDoc.data();
+        console.log('Found service:', serviceData);
+        return {
+          id: serviceDoc.id,
+          name: serviceData.name,
+          processingTime: serviceData.processingTime || 'Time not specified'
+        };
+      }
+      
+      console.log('Service not found:', serviceId);
+      return {
+        id: serviceId,
+        name: serviceId,
+        processingTime: 'Time not specified'
+      };
+    });
+    
+    serviceDetails.value = await Promise.all(servicePromises);
+    console.log('Service details:', serviceDetails.value);
+  } catch (error) {
+    console.error('Error fetching service details:', error);
+    // Fallback to basic service info
+    serviceDetails.value = serviceIds.map(id => ({
+      id: id,
+      name: id,
+      processingTime: 'Time not specified'
+    }));
+  }
+};
+
+const fetchFutureAppointments = async () => {
+  try {
+    const currentVetId = authStore.user?.userId;
+    if (!currentVetId) return;
+    
+    // Get future appointments for this vet, excluding the current appointment being rescheduled
+    const futureAppts = appointments.value.filter(appt => {
+      if (appt.doctorId !== currentVetId) return false;
+      if (appt.status === 'cancelled' || appt.status === 'ended') return false;
+      
+      // Exclude the current appointment being rescheduled
+      if (reschedulingAppointment.value && appt.id === reschedulingAppointment.value.id) return false;
+      
+      const apptDate = new Date(appt.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      return apptDate >= today;
+    });
+    
+    // Remove duplicates based on appointment ID
+    const uniqueAppts = futureAppts.filter((appt, index, self) => 
+      index === self.findIndex(a => a.id === appt.id)
+    );
+    
+    // Sort by date and time
+    futureAppointments.value = uniqueAppts.sort((a, b) => {
+      const dateA = new Date(`${a.date} ${a.time}`);
+      const dateB = new Date(`${b.date} ${b.time}`);
+      return dateA - dateB;
+    });
+  } catch (error) {
+    console.error('Error fetching future appointments:', error);
+  }
+};
+
+// ========================================
+// TIME GENERATION FUNCTIONS
+// ========================================
+
+const generateTimeOptionsForDate = (targetDate) => {
+  const date = new Date(targetDate);
+  const dayOfWeek = date.getDay();
+  const schedule = vetSchedule.value?.schedule || '';
+  
+  console.log('Generating time options for:', targetDate, 'Day:', dayOfWeek, 'Schedule:', schedule);
+  
+  // Calculate processing time for the appointment
+  let totalProcessingMinutes = 0;
+  if (serviceDetails.value.length > 0) {
+    totalProcessingMinutes = serviceDetails.value.reduce((total, service) => {
+      const processingTime = service.processingTime;
+      if (processingTime) {
+        // Parse processing time like "1 hour 10 minutes" or "30 minutes"
+        const hourMatch = processingTime.match(/(\d+)\s*hour/);
+        const minuteMatch = processingTime.match(/(\d+)\s*minute/);
+        
+        let hours = 0;
+        let minutes = 0;
+        
+        if (hourMatch) hours = parseInt(hourMatch[1]);
+        if (minuteMatch) minutes = parseInt(minuteMatch[1]);
+        
+        return total + (hours * 60) + minutes;
+      }
+      return total + 30; // Default 30 minutes if no processing time
+    }, 0);
+  }
+  
+  console.log('Total processing minutes:', totalProcessingMinutes);
+  
+  // Parse vet schedule
+  let availableHours = [];
+  if (vetSchedule.value?.schedule) {
+    const schedule = vetSchedule.value.schedule;
+    
+    // Check if selected date is within the vet's working days
+    if (schedule.includes('Mon-Fri')) {
+      // Monday = 1, Tuesday = 2, Wednesday = 3, Thursday = 4, Friday = 5
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        // Extract time range from schedule (e.g., "9:00 AM to 8:00 PM")
+        const timeMatch = schedule.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*to\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        console.log('Time match:', timeMatch);
+        if (timeMatch) {
+          let startHour = parseInt(timeMatch[1]);
+          let startMinute = parseInt(timeMatch[2]);
+          let startPeriod = timeMatch[3].toUpperCase();
+          let endHour = parseInt(timeMatch[4]);
+          let endMinute = parseInt(timeMatch[5]);
+          let endPeriod = timeMatch[6].toUpperCase();
+          
+          console.log('Before conversion - Start:', startHour, startMinute, startPeriod, 'End:', endHour, endMinute, endPeriod);
+          
+          // Convert to 24-hour format
+          if (startPeriod === 'PM' && startHour !== 12) startHour += 12;
+          if (startPeriod === 'AM' && startHour === 12) startHour = 0;
+          if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
+          if (endPeriod === 'AM' && endHour === 12) endHour = 0;
+          
+          console.log('After conversion - Start:', startHour, startMinute, 'End:', endHour, endMinute);
+          
+          // Calculate the latest possible start time considering processing time
+          const endTimeInMinutes = (endHour * 60) + endMinute;
+          const latestStartTimeInMinutes = endTimeInMinutes - totalProcessingMinutes;
+          const latestStartHour = Math.floor(latestStartTimeInMinutes / 60);
+          const latestStartMinute = latestStartTimeInMinutes % 60;
+          
+          console.log('End time in minutes:', endTimeInMinutes);
+          console.log('Latest start time in minutes:', latestStartTimeInMinutes);
+          console.log('Latest start hour:', latestStartHour, 'minute:', latestStartMinute);
+          
+          // Generate time slots based on processing time intervals
+          let currentTimeInMinutes = (startHour * 60) + startMinute;
+          
+          while (currentTimeInMinutes <= latestStartTimeInMinutes) {
+            const hour = Math.floor(currentTimeInMinutes / 60);
+            const minute = currentTimeInMinutes % 60;
+            
+            const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            availableHours.push(time);
+            
+            // Move to next slot based on processing time
+            currentTimeInMinutes += totalProcessingMinutes;
+          }
+          
+          console.log('Generated hours:', availableHours);
+        }
+      } else {
+        console.log('Tomorrow is not a working day');
+      }
+    } else if (schedule.includes('Mon-Sat')) {
+      // Monday = 1, Tuesday = 2, Wednesday = 3, Thursday = 4, Friday = 5, Saturday = 6
+      if (dayOfWeek >= 1 && dayOfWeek <= 6) {
+        // Similar time parsing logic
+        const timeMatch = schedule.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*to\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (timeMatch) {
+          let startHour = parseInt(timeMatch[1]);
+          let startMinute = parseInt(timeMatch[2]);
+          let startPeriod = timeMatch[3].toUpperCase();
+          let endHour = parseInt(timeMatch[4]);
+          let endMinute = parseInt(timeMatch[5]);
+          let endPeriod = timeMatch[6].toUpperCase();
+          
+          // Convert to 24-hour format
+          if (startPeriod === 'PM' && startHour !== 12) startHour += 12;
+          if (startPeriod === 'AM' && startHour === 12) startHour = 0;
+          if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
+          if (endPeriod === 'AM' && endHour === 12) endHour = 0;
+          
+          // Calculate the latest possible start time considering processing time
+          const endTimeInMinutes = (endHour * 60) + endMinute;
+          const latestStartTimeInMinutes = endTimeInMinutes - totalProcessingMinutes;
+          const latestStartHour = Math.floor(latestStartTimeInMinutes / 60);
+          const latestStartMinute = latestStartTimeInMinutes % 60;
+          
+          // Generate time slots based on processing time intervals
+          let currentTimeInMinutes = (startHour * 60) + startMinute;
+          
+          while (currentTimeInMinutes <= latestStartTimeInMinutes) {
+            const hour = Math.floor(currentTimeInMinutes / 60);
+            const minute = currentTimeInMinutes % 60;
+            
+            const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            availableHours.push(time);
+            
+            // Move to next slot based on processing time
+            currentTimeInMinutes += totalProcessingMinutes;
+          }
+        }
+      }
+    }
+  }
+  
+  console.log('Available hours before default:', availableHours);
+  
+  // If no schedule found or not a working day, use default hours (9 AM to 6 PM)
+  if (availableHours.length === 0) {
+    console.log('Using default hours');
+    const defaultEndHour = 18; // 6 PM
+    const latestStartTimeInMinutes = (defaultEndHour * 60) - totalProcessingMinutes;
+    
+    // Generate time slots based on processing time intervals
+    let currentTimeInMinutes = 9 * 60; // 9 AM
+    
+    while (currentTimeInMinutes <= latestStartTimeInMinutes) {
+      const hour = Math.floor(currentTimeInMinutes / 60);
+      const minute = currentTimeInMinutes % 60;
+      
+      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      availableHours.push(time);
+      
+      // Move to next slot based on processing time
+      currentTimeInMinutes += totalProcessingMinutes;
+    }
+  }
+  
+  // Get appointments for the selected date
+  const selectedDateAppointments = futureAppointments.value.filter(appt => {
+    return appt.date === targetDate;
+  });
+  
+  console.log('Appointments on selected date:', selectedDateAppointments.length);
+  
+  // Find available time slots considering appointment duration and processing time
+  const availableSlots = availableHours.filter(timeSlot => {
+    // Calculate the end time of the new appointment considering processing time
+    const [slotHour, slotMinute] = timeSlot.split(':').map(Number);
+    const slotTimeInMinutes = (slotHour * 60) + slotMinute;
+    const newAppointmentEndTimeInMinutes = slotTimeInMinutes + totalProcessingMinutes;
+    
+    // Convert back to time format for comparison
+    const newAppointmentEndHour = Math.floor(newAppointmentEndTimeInMinutes / 60);
+    const newAppointmentEndMinute = newAppointmentEndTimeInMinutes % 60;
+    const newAppointmentEndTime = `${newAppointmentEndHour.toString().padStart(2, '0')}:${newAppointmentEndMinute.toString().padStart(2, '0')}`;
+    
+    return !selectedDateAppointments.some(appt => {
+      // Parse appointment time (e.g., "10:10 AM - 11:20 AM")
+      const timeRange = appt.time;
+      const timeMatch = timeRange.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      
+      if (timeMatch) {
+        let startHour = parseInt(timeMatch[1]);
+        let startMinute = parseInt(timeMatch[2]);
+        let startPeriod = timeMatch[3].toUpperCase();
+        let endHour = parseInt(timeMatch[4]);
+        let endMinute = parseInt(timeMatch[5]);
+        let endPeriod = timeMatch[6].toUpperCase();
+        
+        // Convert to 24-hour format
+        if (startPeriod === 'PM' && startHour !== 12) startHour += 12;
+        if (startPeriod === 'AM' && startHour === 12) startHour = 0;
+        if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
+        if (endPeriod === 'AM' && endHour === 12) endHour = 0;
+        
+        const appointmentStart = new Date(`2000-01-01 ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`);
+        const appointmentEnd = new Date(`2000-01-01 ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`);
+        const slotTime = new Date(`2000-01-01 ${timeSlot}`);
+        const newAppointmentEnd = new Date(`2000-01-01 ${newAppointmentEndTime}`);
+        
+        // Check if the new appointment (with processing time) conflicts with existing appointment
+        // Conflict occurs if:
+        // 1. New appointment starts during existing appointment
+        // 2. New appointment ends during existing appointment  
+        // 3. New appointment completely contains existing appointment
+        // 4. New appointment overlaps with existing appointment
+        
+        // Convert times to minutes for easier comparison
+        const slotTimeInMinutes = slotTime.getHours() * 60 + slotTime.getMinutes();
+        const newAppointmentEndInMinutes = newAppointmentEnd.getHours() * 60 + newAppointmentEnd.getMinutes();
+        const appointmentStartInMinutes = appointmentStart.getHours() * 60 + appointmentStart.getMinutes();
+        const appointmentEndInMinutes = appointmentEnd.getHours() * 60 + appointmentEnd.getMinutes();
+        
+        // Check for overlap: if the new appointment overlaps with the existing one
+        const hasOverlap = !(newAppointmentEndInMinutes <= appointmentStartInMinutes || slotTimeInMinutes >= appointmentEndInMinutes);
+        
+        return hasOverlap;
+      }
+      
+      return false;
+    });
+  });
+  
+  console.log('Available slots after filtering:', availableSlots);
+  console.log('Available time slots:', availableSlots.length);
+  
+  // Create options for available slots with time intervals
+  autoRescheduleOptions.value = availableSlots.map((time, index) => {
+    // Calculate end time based on processing time
+    const [startHour, startMinute] = time.split(':').map(Number);
+    const startTimeInMinutes = (startHour * 60) + startMinute;
+    const endTimeInMinutes = startTimeInMinutes + totalProcessingMinutes;
+    
+    const endHour = Math.floor(endTimeInMinutes / 60);
+    const endMinute = endTimeInMinutes % 60;
+    const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+    
+    // Convert start time to 12-hour format
+    const startHour12 = startHour === 0 ? 12 : startHour > 12 ? startHour - 12 : startHour;
+    const startPeriod = startHour >= 12 ? 'PM' : 'AM';
+    const startDisplayTime = `${startHour12}:${startMinute.toString().padStart(2, '0')} ${startPeriod}`;
+    
+    // Convert end time to 12-hour format
+    const endHour12 = endHour === 0 ? 12 : endHour > 12 ? endHour - 12 : endHour;
+    const endPeriod = endHour >= 12 ? 'PM' : 'AM';
+    const endDisplayTime = `${endHour12}:${endMinute.toString().padStart(2, '0')} ${endPeriod}`;
+    
+    // Create time interval display
+    const timeInterval = `${startDisplayTime} - ${endDisplayTime}`;
+    
+    return {
+      label: time,
+      value: `slot_${index}`,
+      description: `Available: ${timeInterval}`,
+      date: targetDate,
+      time: time,
+      displayTime: timeInterval,
+      period: startPeriod,
+      endTime: endTime,
+      endDisplayTime: endDisplayTime
+    };
+  });
+  
+  console.log('Generated time options:', autoRescheduleOptions.value.length);
+};
+
+const filteredTimeOptions = computed(() => {
+  return autoRescheduleOptions.value.filter(option => {
+    // Filter based on the start time period
+    return option.period === selectedTimePeriod.value;
+  });
+});
+
+// Calendar computed properties
+const currentMonthYear = computed(() => {
+  return format(currentMonth.value, 'MMMM yyyy');
+});
+
+const weekDays = computed(() => {
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+});
+
+const calendarDays = computed(() => {
+  const year = currentMonth.value.getFullYear();
+  const month = currentMonth.value.getMonth();
+  
+  // Get first day of month and last day of month
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const firstDayOfWeek = firstDay.getDay();
+  
+  const days = [];
+  const today = new Date();
+  today.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
+  
+  // Helper function to create day object
+  const createDayObject = (date, isCurrentMonth = false) => ({
+    date: date.toISOString().split('T')[0],
+    dayNumber: date.getDate(),
+    isCurrentMonth,
+    isToday: date.toDateString() === today.toDateString(),
+    isSelected: tempSelectedDate.value === date.toISOString().split('T')[0],
+    isPast: date < today,
+    isWorkingDay: isWorkingDay(date)
+  });
+  
+  // Add days from previous month
+  const lastDayOfPrevMonth = new Date(year, month, 0).getDate();
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+    const date = new Date(year, month - 1, lastDayOfPrevMonth - i, 12, 0, 0, 0);
+    days.push(createDayObject(date, false));
+  }
+  
+  // Add days from current month
+  for (let i = 1; i <= lastDay.getDate(); i++) {
+    const date = new Date(year, month, i, 12, 0, 0, 0); // Set to noon to avoid timezone issues
+    days.push(createDayObject(date, true));
+  }
+  
+  // Add days from next month to fill the grid (6 rows * 7 days = 42)
+  const remainingDays = 42 - days.length;
+  for (let i = 1; i <= remainingDays; i++) {
+    const date = new Date(year, month + 1, i, 12, 0, 0, 0);
+    days.push(createDayObject(date, false));
+  }
+  
+  return days;
+});
+
+// Watch for service details changes and regenerate options
+watch(serviceDetails, (newServiceDetails) => {
+  if (newServiceDetails.length > 0 && reschedulingAppointment.value && selectedDate.value) {
+    console.log('Service details changed, regenerating options');
+    generateTimeOptionsForDate(selectedDate.value);
+  }
+}, { deep: true });
+
+// ========================================
+// APPOINTMENT MANAGEMENT FUNCTIONS
+// ========================================
+
+// Function to update expired appointments
+const updateExpiredAppointments = async () => {
+  const now = new Date();
+  
+  for (const appointment of appointments.value) {
+    if (isExpired(appointment) && appointment.status === 'pending') {
+      try {
+        // Update appointment status to expired
+        await appointmentStore.updateAppointmentStatus(appointment.id, 'expired');
+        
+        // Update local state
+        const index = appointments.value.findIndex(a => a.id === appointment.id);
+        if (index !== -1) {
+          appointments.value[index] = {
+            ...appointments.value[index],
+            status: 'expired',
+            updatedAt: new Date()
+          };
+        }
+        
+        console.log(`Updated appointment ${appointment.id} to expired status`);
+      } catch (error) {
+        console.error(`Error updating appointment ${appointment.id} to expired:`, error);
+      }
+    }
+  }
+};
+
+// Check for expired appointments when component mounts and set up interval
+let expiredCheckInterval;
+onMounted(() => {
+  updateExpiredAppointments();
+  expiredCheckInterval = setInterval(updateExpiredAppointments, 60000); // Check every minute
+});
+
+onBeforeUnmount(() => {
+  if (expiredCheckInterval) {
+    clearInterval(expiredCheckInterval);
+  }
+});
+
+// ========================================
+// RESCHEDULE FUNCTIONS
+// ========================================
+
+const selectAutoRescheduleOption = (option) => {
+  // Validate the selected time before allowing selection
+  const validation = validateRescheduleTime(
+    option.date, 
+    option.displayTime, 
+    reschedulingAppointment.value?.id
+  );
+  
+  if (!validation.isValid) {
+    errorMessage.value = validation.conflict;
+    showErrorModal.value = true;
+    return;
+  }
+  
+  selectedAutoOption.value = option.value;
+  selectedAutoRescheduleDate.value = option.date;
+  selectedAutoRescheduleTime.value = option.displayTime; // Use the full time interval
+};
+
+// Validation function to check for appointment conflicts
+const validateRescheduleTime = (targetDate, targetTime, appointmentId) => {
+  // Get appointments for the target date (excluding the current appointment being rescheduled)
+  const dateAppointments = futureAppointments.value.filter(appt => 
+    appt.date === targetDate && appt.id !== appointmentId
+  );
+  
+  if (dateAppointments.length === 0) {
+    return { isValid: true, conflict: null };
+  }
+  
+  // Parse the target time (e.g., "10:10 AM - 11:20 AM")
+  const timeMatch = targetTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!timeMatch) {
+    return { isValid: false, conflict: 'Invalid time format' };
+  }
+  
+  // Parse target appointment times
+  let targetStartHour = parseInt(timeMatch[1]);
+  let targetStartMinute = parseInt(timeMatch[2]);
+  let targetStartPeriod = timeMatch[3].toUpperCase();
+  let targetEndHour = parseInt(timeMatch[4]);
+  let targetEndMinute = parseInt(timeMatch[5]);
+  let targetEndPeriod = timeMatch[6].toUpperCase();
+  
+  // Convert to 24-hour format
+  if (targetStartPeriod === 'PM' && targetStartHour !== 12) targetStartHour += 12;
+  if (targetStartPeriod === 'AM' && targetStartHour === 12) targetStartHour = 0;
+  if (targetEndPeriod === 'PM' && targetEndHour !== 12) targetEndHour += 12;
+  if (targetEndPeriod === 'AM' && targetEndHour === 12) targetEndHour = 0;
+  
+  const targetStartInMinutes = targetStartHour * 60 + targetStartMinute;
+  const targetEndInMinutes = targetEndHour * 60 + targetEndMinute;
+  
+  // Check for conflicts with existing appointments
+  for (const appt of dateAppointments) {
+    const apptTimeMatch = appt.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (apptTimeMatch) {
+      let apptStartHour = parseInt(apptTimeMatch[1]);
+      let apptStartMinute = parseInt(apptTimeMatch[2]);
+      let apptStartPeriod = apptTimeMatch[3].toUpperCase();
+      let apptEndHour = parseInt(apptTimeMatch[4]);
+      let apptEndMinute = parseInt(apptTimeMatch[5]);
+      let apptEndPeriod = apptTimeMatch[6].toUpperCase();
+      
+      // Convert to 24-hour format
+      if (apptStartPeriod === 'PM' && apptStartHour !== 12) apptStartHour += 12;
+      if (apptStartPeriod === 'AM' && apptStartHour === 12) apptStartHour = 0;
+      if (apptEndPeriod === 'PM' && apptEndHour !== 12) apptEndHour += 12;
+      if (apptEndPeriod === 'AM' && apptEndHour === 12) apptEndHour = 0;
+      
+      const apptStartInMinutes = apptStartHour * 60 + apptStartMinute;
+      const apptEndInMinutes = apptEndHour * 60 + apptEndMinute;
+      
+      // Check for overlap
+      const hasOverlap = !(targetEndInMinutes <= apptStartInMinutes || targetStartInMinutes >= apptEndInMinutes);
+      
+      if (hasOverlap) {
+        return { 
+          isValid: false, 
+          conflict: `Conflicts with existing appointment: ${appt.time} (${appt.petName})` 
+        };
+      }
+    }
+  }
+  
+  return { isValid: true, conflict: null };
+};
+
+const executeRescheduleRequest = async () => {
+  if (!selectedAutoOption.value || !reschedulingAppointment.value || !rescheduleReason.value.trim()) {
+    errorMessage.value = 'Please provide a reason for the reschedule request and select a preferred time.';
+    showErrorModal.value = true;
+    return;
+  }
+  
+  autoRescheduleLoading.value = true;
+  
+  try {
+    // Create reschedule request data
+    const rescheduleRequestData = {
+      suggestedDate: selectedAutoRescheduleDate.value,
+      suggestedTime: selectedAutoRescheduleTime.value,
+      reason: rescheduleReason.value.trim(),
+      requestedBy: authStore.user?.userId || 'vet',
+      requestedAt: new Date(),
+      status: 'reschedule_requested'
+    };
+    
+    // Update appointment with reschedule request (no status change needed)
+    await appointmentStore.updateAppointment(reschedulingAppointment.value.id, {
+      rescheduleRequest: rescheduleRequestData,
+      updatedAt: new Date()
+    });
+    
+    // Update local state
+    const index = appointments.value.findIndex(a => a.id === reschedulingAppointment.value.id);
+    if (index !== -1) {
+      appointments.value[index] = {
+        ...appointments.value[index],
+        rescheduleRequest: rescheduleRequestData,
+        updatedAt: new Date()
+      };
+    }
+
+    // Notify the appointment owner about the reschedule request
+    try {
+      const readableDate = format(new Date(selectedAutoRescheduleDate.value), 'MMM dd, yyyy');
+      const title = 'Reschedule Request';
+      const description = `Your vet has requested to reschedule your appointment to ${readableDate} at ${selectedAutoRescheduleTime.value}. Reason: ${rescheduleReason.value.trim()}. Please review and respond.`;
+      
+      // Ensure notification service has the store
+      notificationService.setNotificationsStore(notificationsStore);
+      // Set current user context for service (for fallback flows)
+      // Removed - no longer needed after removing notificationSyncService
+      
+      await notificationService.storeNotificationInFirestore(title, description, {
+        type: 'appointment',
+        url: '/user/notifications',
+        userId: reschedulingAppointment.value.userId,
+        appointmentId: reschedulingAppointment.value.id,
+        status: 'reschedule_requested',
+        fromClient: true,
+        deleted: false,
+        forceFallback: true
+      });
+    } catch (notifyErr) {
+      console.error('Failed to send notification:', notifyErr);
+    }
+
+    // Send SMS notification for reschedule request
+    try {
+      await sendAppointmentNotification(reschedulingAppointment.value.id, 'reschedule', 'reschedule_requested');
+    } catch (smsErr) {
+      console.error('Failed to send SMS reschedule notification:', smsErr);
+      // Don't break the flow if SMS fails
+    }
+    
+    // Notify the vet about the reschedule request sent
+    try {
+      const vetTitle = 'Reschedule Request Sent';
+      const vetDescription = `You have sent a reschedule request for appointment with ${reschedulingAppointment.value.ownerName} (${reschedulingAppointment.value.petNames?.join(', ') || 'pet'}). Suggested time: ${selectedAutoRescheduleDate.value} at ${selectedAutoRescheduleTime.value}. The client will be notified to review your request.`;
+      
+      // Send notification to the current vet
+      if (authStore.user?.userId) {
+        await notificationService.storeNotificationInFirestore(vetTitle, vetDescription, {
+          type: 'appointment',
+          url: '/vet/appointments',
+          userId: authStore.user.userId,
+          appointmentId: reschedulingAppointment.value.id,
+          status: 'reschedule_request_sent',
+          fromClient: false,
+          deleted: false,
+          forceFallback: true
+        });
+      }
+    } catch (vetNotifyErr) {
+      console.error('Failed to send vet notification:', vetNotifyErr);
+    }
+    
+
+    
+    // Close panel and show success
+    closeAutoReschedulePanel();
+    successTitle.value = 'Reschedule Request Sent';
+    successMessage.value = `Your reschedule request has been sent to the client. They will be notified to review your suggested time (${selectedAutoRescheduleDate.value} at ${selectedAutoRescheduleTime.value}) and can choose to accept, decline, or suggest an alternative.`;
+    showSuccessModal.value = true;
+    
+  } catch (error) {
+    console.error('Error sending reschedule request:', error);
+    errorMessage.value = 'Failed to send reschedule request. Please try again.';
+    showErrorModal.value = true;
+  } finally {
+    autoRescheduleLoading.value = false;
+  }
+};
+
+// ========================================
+// NOTIFICATION FUNCTIONS
+// ========================================
+
+const sendAppointmentNotification = async (appointmentId, action, status) => {
+  try {
+    // Get the appointment details
+    const appointmentData = appointments.value.find(a => a.id === appointmentId);
+    if (!appointmentData) {
+      console.error('Appointment not found for notification');
+      return;
+    }
+
+    // Build a robust subject (pet names or category) to avoid "null"
+    const petNamesJoined = Array.isArray(appointmentData.petNames) && appointmentData.petNames.length > 0
+      ? appointmentData.petNames.map((n) => (n || '').trim()).filter(Boolean).join(', ')
+      : (appointmentData.petName || '').trim();
+    const subject = appointmentData.isHealthCertificate
+      ? 'your Veterinary Health Certificate appointment'
+      : (petNamesJoined ? `your appointment for ${petNamesJoined}` : 'your appointment');
+
+    // Create notification message based on action
+    let title, description;
+    const dateStr = format(new Date(appointmentData.date), 'MMM dd, yyyy');
+    switch (action) {
+      case 'approve':
+        title = 'Appointment Approved!';
+        description = `${subject} on ${dateStr} at ${appointmentData.time} has been approved.`;
+        break;
+      case 'reject':
+        title = 'Appointment Rejected';
+        description = `${subject} on ${dateStr} at ${appointmentData.time} has been rejected.`;
+        break;
+      case 'reschedule':
+        title = 'Appointment Rescheduled';
+        description = `${subject} on ${dateStr} at ${appointmentData.time} has been rescheduled.`;
+        break;
+      case 'cancel':
+        title = 'Appointment Cancelled';
+        description = `${subject} on ${dateStr} at ${appointmentData.time} has been cancelled.`;
+        break;
+      case 'complete':
+        title = 'Appointment Completed';
+        description = `${subject} on ${dateStr} at ${appointmentData.time} has been completed.`;
+        break;
+    default:
+        title = 'Appointment Status Updated';
+        description = `Your appointment status has been updated to ${status}.`;
+    }
+
+    // Ensure notification service is wired and has a user context (for fallback flows)
+    notificationService.setNotificationsStore(notificationsStore);
+
+    // Send notification to the USER (not the vet)
+    await notificationService.showNotification(title, description, {
+      type: 'appointment',
+      url: '/user/notifications',
+      userId: appointmentData.userId, // This is the USER's ID
+      appointmentId: String(appointmentId),
+      status: status,
+      fromClient: false, // This is from the vet, not the client
+      storeInFirestore: true
+    });
+
+    console.log(`User notification sent for appointment ${appointmentId}: ${action}`);
+    
+    // Send SMS notification for approval (only for approved appointments)
+    if (action === 'approve') {
+      try {
+        console.log('📱 Processing SMS notification for appointment approval...');
+        
+        // Get user's phone number and verification status
+        const userRef = doc(db, 'users', appointmentData.userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const userPhone = userData.phone;
+          const isPhoneVerified = userData.phoneVerified;
+          
+          console.log('📱 User phone data for SMS:', { phone: userPhone, verified: isPhoneVerified });
+          
+          // Only send SMS if phone is verified and phone number exists
+          if (isPhoneVerified && userPhone && userPhone.trim() !== '') {
+            const petNames = appointmentData.petNames || [appointmentData.petName] || ['Pet'];
+            const appointmentDate = appointmentData.date;
+            const appointmentTime = appointmentData.time;
+            const isHealthCertificate = appointmentData.isHealthCertificate || false;
+            
+            console.log('📱 Sending SMS approval to:', userPhone);
+            console.log('📱 SMS data:', { petNames, appointmentDate, appointmentTime, isHealthCertificate });
+            
+            // Send SMS approval
+            const smsResult = await smsService.sendAppointmentApproval(
+              userPhone, 
+              petNames, 
+              appointmentDate, 
+              appointmentTime, 
+              isHealthCertificate
+            );
+            
+            if (smsResult.success) {
+              console.log('📱 SMS approval sent successfully:', smsResult.messageId);
+            } else {
+              console.log('❌ SMS approval failed:', smsResult.error);
+            }
+          } else {
+            console.log('⚠️ Skipping SMS approval: phone not verified or no phone number');
+          }
+        } else {
+          console.log('⚠️ User document not found for SMS approval');
+        }
+      } catch (smsError) {
+        console.error('❌ Error processing SMS approval:', smsError);
+        // Don't break the notification flow if SMS fails
+      }
+    }
+
+    // Send SMS notification for rejection (only for rejected appointments)
+    if (action === 'reject') {
+      try {
+        console.log('📱 Processing SMS notification for appointment rejection...');
+        
+        // Get user's phone number and verification status
+        const userRef = doc(db, 'users', appointmentData.userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const userPhone = userData.phone;
+          const isPhoneVerified = userData.phoneVerified;
+          
+          console.log('📱 User phone data for SMS:', { phone: userPhone, verified: isPhoneVerified });
+          
+          // Only send SMS if phone is verified and phone number exists
+          if (isPhoneVerified && userPhone && userPhone.trim() !== '') {
+            const petNames = appointmentData.petNames || [appointmentData.petName] || ['Pet'];
+            const appointmentDate = appointmentData.date;
+            const appointmentTime = appointmentData.time;
+            const isHealthCertificate = appointmentData.isHealthCertificate || false;
+            
+            console.log('📱 Sending SMS rejection to:', userPhone);
+            console.log('📱 SMS data:', { petNames, appointmentDate, appointmentTime, isHealthCertificate });
+            
+            // Send SMS rejection
+            const smsResult = await smsService.sendAppointmentRejection(
+              userPhone, 
+              petNames, 
+              appointmentDate, 
+              appointmentTime, 
+              isHealthCertificate
+            );
+            
+            if (smsResult.success) {
+              console.log('📱 SMS rejection sent successfully:', smsResult.messageId);
+              console.log('📱 SMS rejection message:', smsResult.message);
+            } else {
+              console.log('❌ SMS rejection failed:', smsResult.error);
+            }
+          } else {
+            console.log('⚠️ Skipping SMS rejection: phone not verified or no phone number');
+          }
+        } else {
+          console.log('⚠️ User document not found for SMS rejection');
+        }
+      } catch (smsError) {
+        console.error('❌ Error processing SMS rejection:', smsError);
+        // Don't break the notification flow if SMS fails
+      }
+    }
+
+    // Send SMS notification for reschedule (only for rescheduled appointments)
+    if (action === 'reschedule') {
+      try {
+        console.log('📱 Processing SMS notification for appointment reschedule...');
+        
+        // Get user's phone number and verification status
+        const userRef = doc(db, 'users', appointmentData.userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const userPhone = userData.phone;
+          const isPhoneVerified = userData.phoneVerified;
+          
+          console.log('📱 User phone data for SMS:', { phone: userPhone, verified: isPhoneVerified });
+          
+          // Only send SMS if phone is verified and phone number exists
+          if (isPhoneVerified && userPhone && userPhone.trim() !== '') {
+            const petNames = appointmentData.petNames || [appointmentData.petName] || ['Pet'];
+            const appointmentDate = appointmentData.date;
+            const appointmentTime = appointmentData.time;
+            const isHealthCertificate = appointmentData.isHealthCertificate || false;
+            
+            console.log('📱 Sending SMS reschedule to:', userPhone);
+            console.log('📱 SMS data:', { petNames, appointmentDate, appointmentTime, isHealthCertificate });
+            
+            // Send SMS reschedule
+            const smsResult = await smsService.sendAppointmentReschedule(
+              userPhone, 
+              petNames, 
+              appointmentDate, 
+              appointmentTime, 
+              isHealthCertificate
+            );
+            
+            if (smsResult.success) {
+              console.log('📱 SMS reschedule sent successfully:', smsResult.messageId);
+              console.log('📱 SMS reschedule message:', smsResult.message);
+            } else {
+              console.log('❌ SMS reschedule failed:', smsResult.error);
+            }
+          } else {
+            console.log('⚠️ Skipping SMS reschedule: phone not verified or no phone number');
+          }
+        } else {
+          console.log('⚠️ User document not found for SMS reschedule');
+        }
+      } catch (smsError) {
+        console.error('❌ Error processing SMS reschedule:', smsError);
+        // Don't break the notification flow if SMS fails
+      }
+    }
+
+    // Send SMS notification for completion (only for completed appointments)
+    if (action === 'complete') {
+      try {
+        console.log('📱 Processing SMS notification for appointment completion...');
+        
+        // Get user's phone number and verification status
+        const userRef = doc(db, 'users', appointmentData.userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const userPhone = userData.phone;
+          const isPhoneVerified = userData.phoneVerified;
+          
+          console.log('📱 User phone data for SMS:', { phone: userPhone, verified: isPhoneVerified });
+          
+          // Only send SMS if phone is verified and phone number exists
+          if (isPhoneVerified && userPhone && userPhone.trim() !== '') {
+            const petNames = appointmentData.petNames || [appointmentData.petName] || ['Pet'];
+            const appointmentDate = appointmentData.date;
+            const appointmentTime = appointmentData.time;
+            const isHealthCertificate = appointmentData.isHealthCertificate || false;
+            
+            console.log('📱 Sending SMS completion to:', userPhone);
+            console.log('📱 SMS data:', { petNames, appointmentDate, appointmentTime, isHealthCertificate });
+            
+            // Send SMS completion
+            const smsResult = await smsService.sendAppointmentCompletion(
+              userPhone, 
+              petNames, 
+              appointmentDate, 
+              appointmentTime, 
+              isHealthCertificate
+            );
+            
+            if (smsResult.success) {
+              console.log('📱 SMS completion sent successfully:', smsResult.messageId);
+              console.log('📱 SMS completion message:', smsResult.message);
+            } else {
+              console.log('❌ SMS completion failed:', smsResult.error);
+            }
+          } else {
+            console.log('⚠️ Skipping SMS completion: phone not verified or no phone number');
+          }
+        } else {
+          console.log('⚠️ User document not found for SMS completion');
+        }
+      } catch (smsError) {
+        console.error('❌ Error processing SMS completion:', smsError);
+        // Don't break the notification flow if SMS fails
+      }
+    }
+  } catch (error) {
+    console.error('Error sending user notification:', error);
+  }
+};
+
+// Send notification TO the vet about their action
+const sendVetNotification = async (appointmentId, action, status) => {
+  try {
+    // Get the appointment details
+    const appointmentData = appointments.value.find(a => a.id === appointmentId);
+    if (!appointmentData) {
+      console.error('Appointment not found for vet notification');
+      return;
+    }
+
+    // Get current vet's user ID
+    const currentVetId = authStore.user?.userId;
+    if (!currentVetId) {
+      console.error('No vet user ID available for notification');
+      return;
+    }
+
+    // Build pet names for the notification
+    const petNamesJoined = Array.isArray(appointmentData.petNames) && appointmentData.petNames.length > 0
+      ? appointmentData.petNames.map((n) => (n || '').trim()).filter(Boolean).join(', ')
+      : (appointmentData.petName || '').trim();
+
+    // Create vet-specific notification message
+    let title, description;
+    const dateStr = format(new Date(appointmentData.date), 'MMM dd, yyyy');
+    switch (action) {
+      case 'approve':
+        title = 'Appointment Approved';
+        description = `You approved an appointment for ${petNamesJoined || 'pet'} on ${dateStr} at ${appointmentData.time}`;
+        break;
+      case 'reject':
+        title = 'Appointment Rejected';
+        description = `You rejected an appointment for ${petNamesJoined || 'pet'} on ${dateStr} at ${appointmentData.time}`;
+        break;
+      case 'reschedule':
+        title = 'Appointment Rescheduled';
+        description = `You rescheduled an appointment for ${petNamesJoined || 'pet'} on ${dateStr} at ${appointmentData.time}`;
+        break;
+      case 'cancel':
+        title = 'Appointment Cancelled';
+        description = `You cancelled an appointment for ${petNamesJoined || 'pet'} on ${dateStr} at ${appointmentData.time}`;
+        break;
+      case 'complete':
+        title = 'Appointment Completed';
+        description = `You completed an appointment for ${petNamesJoined || 'pet'} on ${dateStr} at ${appointmentData.time}`;
+        break;
+      default:
+        title = 'Appointment Action Completed';
+        description = `You updated appointment status to ${status}`;
+    }
+
+    // Ensure notification service is wired
+    notificationService.setNotificationsStore(notificationsStore);
+    
+    // Send notification TO the VET
+    await notificationService.showNotification(title, description, {
+      type: 'vet_action',
+      url: '/vet/appointments/vetappointmentapproval',
+      userId: currentVetId, // This is the VET's ID
+      appointmentId: String(appointmentId),
+      status: status,
+      fromClient: false,
+      storeInFirestore: true
+    });
+
+    console.log(`Vet notification sent for appointment ${appointmentId}: ${action}`);
+  } catch (error) {
+    console.error('Error sending vet notification:', error);
+  }
+};
+
+// Send detailed completion notification with service summary and recommendations
+const sendDetailedCompletionNotification = async (appointmentId, completionData) => {
+  try {
+    // Get the appointment details
+    const appointmentData = appointments.value.find(a => a.id === appointmentId);
+    if (!appointmentData) {
+      console.error('Appointment not found for detailed notification');
+      return;
+    }
+
+    // Build pet names for the notification
+    const petNamesJoined = Array.isArray(appointmentData.petNames) && appointmentData.petNames.length > 0
+      ? appointmentData.petNames.map((n) => (n || '').trim()).filter(Boolean).join(', ')
+      : (appointmentData.petName || '').trim();
+
+    // Create detailed completion notification
+    const title = 'Appointment Completed - Summary Available';
+    const description = `Your appointment for ${petNamesJoined || 'your pet'} has been completed. View the detailed service summary, health assessment, and care instructions in your notifications.`;
+
+    // Ensure notification service is wired
+    notificationService.setNotificationsStore(notificationsStore);
+    // Removed - no longer needed after removing notificationSyncService
+
+    // Store detailed completion notification
+      await notificationService.storeNotificationInFirestore(title, description, {
+      type: 'appointment_completion',
+        url: '/user/notifications',
+        userId: appointmentData.userId,
+        appointmentId: String(appointmentId),
+      status: 'completed',
+        fromClient: true,
+        deleted: false,
+        forceFallback: true,
+      skipDuplicateCheck: true,
+      // Include completion data for reference
+      completionData: {
+        services: completionData.services,
+        pets: completionData.pets,
+        generalNotes: completionData.generalNotes
+      }
+    });
+
+    console.log(`Detailed completion notification sent for appointment ${appointmentId}`);
+  } catch (error) {
+    console.error('Error sending detailed completion notification:', error);
+  }
+};
+
+
+
+// ========================================
+// APPOINTMENT ACTION FUNCTIONS
+// ========================================
+
+const approveAppointment = async (appointmentId) => {
+  try {
+    // Update the appointment status to approved
+    await appointmentStore.updateAppointment(
+      appointmentId, 
+      {
+        status: 'approved',
+        approvedBy: 'vet',
+        approvedAt: new Date()
+      }
+    );
+    
+    // Update the local state
+    const index = appointments.value.findIndex(a => a.id === appointmentId);
+    if (index !== -1) {
+      appointments.value[index].status = 'approved';
+      appointments.value[index].approvedBy = 'vet';
+      appointments.value[index].approvedAt = new Date();
+      appointments.value[index].updatedAt = new Date();
+    }
+    
+    // Send notification to the user
+    await sendAppointmentNotification(appointmentId, 'approve', 'approved');
+    
+
+    
+    // Send notification to the vet about their action
+    await sendVetNotification(appointmentId, 'approve', 'approved');
+    
+    // Show success message
+    successTitle.value = 'Appointment Approved';
+    successMessage.value = 'The appointment has been approved successfully.';
+    showSuccessModal.value = true;
+    
+  } catch (error) {
+    console.error('Error approving appointment:', error);
+    errorMessage.value = 'Failed to approve appointment. Please try again.';
+    showErrorModal.value = true;
+  }
+};
+
+const rejectAppointment = async (appointmentId) => {
+  try {
+    // Update the appointment status to rejected
+    await appointmentStore.updateAppointment(
+      appointmentId, 
+      {
+        status: 'rejected',
+        rejectedBy: 'vet',
+        rejectedAt: new Date()
+      }
+    );
+    
+    // Update the local state
+    const index = appointments.value.findIndex(a => a.id === appointmentId);
+    if (index !== -1) {
+      appointments.value[index].status = 'rejected';
+      appointments.value[index].rejectedBy = 'vet';
+      appointments.value[index].rejectedAt = new Date();
+      appointments.value[index].updatedAt = new Date();
+    }
+    
+    // Send notification to the user
+    await sendAppointmentNotification(appointmentId, 'reject', 'rejected');
+    
+
+    
+    // Send notification to the vet about their action
+    await sendVetNotification(appointmentId, 'reject', 'rejected');
+    
+    // Show success message
+    successTitle.value = 'Appointment Rejected';
+    successMessage.value = 'The appointment has been rejected successfully.';
+    showSuccessModal.value = true;
+    
+  } catch (error) {
+    console.error('Error rejecting appointment:', error);
+    errorMessage.value = 'Failed to reject appointment. Please try again.';
+    showErrorModal.value = true;
+  }
+};
+
+const cancelApprovedAppointment = async (appointmentId) => {
+  try {
+    // Update the appointment status to cancelled
+    await appointmentStore.updateAppointment(
+      appointmentId, 
+      {
+        status: 'cancelled',
+        cancelledBy: 'vet',
+        cancelledAt: new Date()
+      }
+    );
+    
+    // Update the local state
+    const index = appointments.value.findIndex(a => a.id === appointmentId);
+    if (index !== -1) {
+      appointments.value[index].status = 'cancelled';
+      appointments.value[index].cancelledBy = 'vet';
+      appointments.value[index].cancelledAt = new Date();
+      appointments.value[index].updatedAt = new Date();
+    }
+    
+    // Send notification to the user
+    await sendAppointmentNotification(appointmentId, 'cancel', 'cancelled');
+    
+
+    
+    // Send notification to the vet about their action
+    await sendVetNotification(appointmentId, 'cancel', 'cancelled');
+    
+    // Show success message
+    successTitle.value = 'Appointment Cancelled';
+    successMessage.value = 'The appointment has been cancelled successfully.';
+    showSuccessModal.value = true;
+    
+  } catch (error) {
+    console.error('Error cancelling appointment:', error);
+    errorMessage.value = 'Failed to cancel appointment. Please try again.';
+    showErrorModal.value = true;
+  }
+};
+
+const completeAppointment = async (appointmentId) => {
+  try {
+    // Update status to completed
+    await appointmentStore.updateAppointment(
+      appointmentId,
+      {
+        status: 'completed',
+        completedBy: 'vet',
+        completedAt: new Date(),
+      }
+    );
+
+    // Update local state
+    const index = appointments.value.findIndex(a => a.id === appointmentId);
+    if (index !== -1) {
+      appointments.value[index].status = 'completed';
+      appointments.value[index].completedBy = 'vet';
+      appointments.value[index].completedAt = new Date();
+      appointments.value[index].updatedAt = new Date();
+    }
+
+    // 🔧 NEW: Check if this appointment has vaccination services and generate vaccination records
+    try {
+      const appointment = appointments.value[index];
+      if (appointment) {
+        await processVaccinationAppointment(appointment, {
+          appointmentId: appointmentId,
+          completedAt: new Date(),
+          completedBy: 'vet'
+        });
+      }
+    } catch (vaccinationError) {
+      console.error('Error processing vaccination appointment:', vaccinationError);
+      // Don't fail the completion if vaccination processing fails
+    }
+
+    // Notify user
+    await sendAppointmentNotification(appointmentId, 'complete', 'completed');
+    
+
+    
+    // Notify vet about their action
+    await sendVetNotification(appointmentId, 'complete', 'completed');
+
+    // Success modal
+    successTitle.value = 'Appointment Completed';
+    successMessage.value = 'The appointment has been marked as completed.';
+    showSuccessModal.value = true;
+  } catch (error) {
+    console.error('Error completing appointment:', error);
+    errorMessage.value = 'Failed to mark appointment as completed. Please try again.';
+    showErrorModal.value = true;
+  }
+};
+
+
+
+// Fetch service categories and services data
+const fetchServiceData = async () => {
+  try {
+    // Import Firebase functions
+    const { collection, getDocs } = await import('firebase/firestore');
+    const { db } = await import('@shared/firebase');
+    
+    // Fetch categories
+    const categoriesRef = collection(db, 'categories');
+    const categoriesSnapshot = await getDocs(categoriesRef);
+    categoriesData.value = {};
+    
+    categoriesSnapshot.forEach(doc => {
+      const data = doc.data();
+      categoriesData.value[doc.id] = {
+        id: doc.id,
+        name: data.name,
+        description: data.description,
+        coverPhoto: data.coverPhoto,
+        archived: data.archived
+      };
+    });
+    
+    // Fetch services
+    const servicesRef = collection(db, 'services');
+    const servicesSnapshot = await getDocs(servicesRef);
+    servicesData.value = {};
+    
+    servicesSnapshot.forEach(doc => {
+      const data = doc.data();
+      servicesData.value[doc.id] = {
+        id: doc.id,
+        name: data.name,
+        categoryId: data.categoryId,
+        classification: data.classification,
+        fees: data.fees,
+        processingTime: data.processingTime,
+        transactionType: data.transactionType,
+        // Vaccination-specific fields
+        isVaccination: data.isVaccination || false,
+        vaccineType: data.vaccineType || '',
+        seriesType: data.seriesType || 'single',
+        minAgeWeeks: data.minAgeWeeks || 6,
+        totalBoosters: data.totalBoosters || 1,
+        nextDoseIn: data.nextDoseIn || 14,
+        nextDoseUnit: data.nextDoseUnit || 'days',
+        reminderDays: data.reminderDays || 30,
+        autoSchedule: data.autoSchedule !== undefined ? data.autoSchedule : true,
+        boosterSchedule: data.boosterSchedule || [],
+        // Telehealth field
+        isTelehealth: data.isTelehealth || false
+      };
+    });
+    
+    // Build service-category mapping by service ID for better accuracy
+    serviceCategories.value = {};
+    
+    Object.values(servicesData.value).forEach(service => {
+      if (service.categoryId && categoriesData.value[service.categoryId]) {
+        serviceCategories.value[service.id] = categoriesData.value[service.categoryId];
+        // Also keep the name mapping for backward compatibility
+        serviceCategories.value[service.name] = categoriesData.value[service.categoryId];
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching service data:', error);
+    // Re-throw the error so the calling function knows it failed
+    throw error;
+  }
+};
+
+// Updated getServiceCategory function - works with both service ID and name
+const getServiceCategory = (serviceIdentifier) => {
+  if (!serviceIdentifier) {
+    return null;
+  }
+  
+  // First try to find by service ID in servicesData (this is the main case for appointments)
+  if (servicesData.value && servicesData.value[serviceIdentifier]) {
+    const service = servicesData.value[serviceIdentifier];
+    if (service && service.categoryId && categoriesData.value[service.categoryId]) {
+      return categoriesData.value[service.categoryId];
+    }
+  }
+  
+  // Then try the pre-built mapping
+  const result = serviceCategories.value[serviceIdentifier] || null;
+  
+  // If still not found, try to find by service name in servicesData
+  if (!result && servicesData.value) {
+    const service = Object.values(servicesData.value).find(s => s.name === serviceIdentifier);
+    if (service && service.categoryId && categoriesData.value[service.categoryId]) {
+      return categoriesData.value[service.categoryId];
+    }
+  }
+  
+  return result;
+};
+
+// Helper function to get service details by ID
+const getServiceById = (serviceId) => {
+  return servicesData.value[serviceId] || null;
+};
+
+// Helper function to get service details by name
+const getServiceByName = (serviceName) => {
+  return Object.values(servicesData.value).find(service => service.name === serviceName) || null;
+};
+
+// Helper function to get service name by ID
+const getServiceNameById = (serviceId) => {
+  if (servicesData.value && servicesData.value[serviceId]) {
+    return servicesData.value[serviceId].name;
+  }
+  return serviceId; // Return the ID if no name found
+};
+
+// Helper function to get display name for service (handles both ID and name)
+const getServiceDisplayName = (serviceIdentifier) => {
+  if (!serviceIdentifier) return 'Unknown Service';
+  
+  // If it's an ID, convert to name (this is the main case for appointments)
+  if (servicesData.value && servicesData.value[serviceIdentifier]) {
+    return servicesData.value[serviceIdentifier].name;
+  }
+  
+  // If it's already a name, return it (fallback case)
+  if (servicesData.value) {
+    const serviceByName = Object.values(servicesData.value).find(s => s.name === serviceIdentifier);
+    if (serviceByName) return serviceIdentifier; // It's already a name
+  }
+  
+  // Fallback - return the identifier as is
+  return serviceIdentifier;
+};
+
+
+
 </script>
 
 <style scoped>
@@ -2339,5 +6827,21 @@ table {
 .stepper-container {
   padding: 0 8px;
 }
+}
+
+/* 🔧 NEW: Highlight effect for appointments found from queue */
+.highlight-appointment {
+  background-color: #dbeafe !important;
+  border-left: 4px solid #3b82f6 !important;
+  animation: pulse-highlight 2s ease-in-out;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% {
+    background-color: #dbeafe;
+  }
+  50% {
+    background-color: #bfdbfe;
+  }
 }
 </style>

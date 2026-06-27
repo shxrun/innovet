@@ -13,8 +13,9 @@
         </div>
       </div>
 
+
       <!-- Hero Content -->
-      <div class="relative px-4 py-24 sm:px-6 lg:px-8 text-center">
+      <div class="relative container mx-auto px-4 py-24 sm:px-6 md:px-8 text-center">
          <!-- Header Section -->
         <div class="text-center mb-16">
           <h2 class="text-4xl font-bold text-white mb-4">Our Services</h2>
@@ -25,8 +26,9 @@
       </div>
     </div>
 
+
     <!-- Services Container that overlaps hero -->
-    <div class="max-w-6xl mx-auto px-8 -mt-80 relative z-10">
+    <div class="container mx-auto px-4 sm:px-6 md:px-8 -mt-80 relative z-10">
       <div class="bg-white rounded-3xl p-8 shadow-lg">
         <div class="text-center mb-8">
           <p class="text-sm uppercase tracking-wider text-blue-500 mb-1">Our Services</p>
@@ -34,16 +36,16 @@
             <span class="text-blue-800">Veterinary</span>
             <span class="text-blue-500"> Services</span>
           </h2>
-        
+       
         </div>
-        <!-- Services Grid - Original services preserved -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <!-- Services Grid - Standardized spacing and widths -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <!-- Walk-in Services -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <StethoscopeIcon class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Walk-in Services</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Basic veterinary services including consultation, treatment, and preventive care.
@@ -55,12 +57,13 @@
             </div>
           </div>
 
+
           <!-- Elective Services -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <CalendarIcon class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Elective Services</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Scheduled services for livestock and community animal health programs.
@@ -72,12 +75,13 @@
             </div>
           </div>
 
+
           <!-- Health Certificate -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <FileTextIcon class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Health Certificate</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Official documentation for animal transport and health verification.
@@ -89,12 +93,13 @@
             </div>
           </div>
 
+
           <!-- Vaccination Services -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <SyringeIcon class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Vaccination</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Comprehensive vaccination programs for pets and livestock.
@@ -106,12 +111,13 @@
             </div>
           </div>
 
+
           <!-- Surgical Services -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <Scissors class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Surgery</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Professional surgical procedures for all types of animals.
@@ -123,12 +129,13 @@
             </div>
           </div>
 
+
           <!-- Technical Assistance -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <HeartPulseIcon class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Technical Support</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Expert guidance and support for animal health management.
@@ -140,12 +147,13 @@
             </div>
           </div>
 
+
           <!-- Laboratory Services -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <FlaskConicalIcon class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Laboratory</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Diagnostic testing and laboratory analysis services.
@@ -157,12 +165,13 @@
             </div>
           </div>
 
+
           <!-- Emergency Care -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <Clock class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Emergency Care</h3>
               <p class="text-gray-600 text-sm mb-3">
                 24/7 emergency veterinary services for urgent cases.
@@ -174,12 +183,13 @@
             </div>
           </div>
 
+
           <!-- Telehealth -->
-          <div class="w-full max-w-[280px] mx-auto rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm">
+          <div class="w-full rounded-2xl border border-transparent hover:border-blue-200 transition-all duration-300 group overflow-hidden shadow-sm flex flex-col">
             <div class="bg-blue-50 p-6 flex items-center justify-center h-44">
               <MonitorIcon class="h-12 w-12 text-blue-600" />
             </div>
-            <div class="p-5 bg-white">
+            <div class="p-5 bg-white flex-1">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Telehealth</h3>
               <p class="text-gray-600 text-sm mb-3">
                 Online consultations and virtual veterinary assistance.
@@ -194,8 +204,9 @@
       </div>
     </div>
 
+
     <div class="max-w-4xl mx-auto px-8 mt-16 mb-16">
-      <div 
+      <div
         class="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl overflow-hidden shadow-lg"
         ref="ctaSection"
       >
@@ -211,7 +222,7 @@
               <div class="absolute top-1/2 -right-10 w-24 h-24 bg-white/10 rounded-full transform -translate-y-1/2 transition-all duration-700 animate-float-fast"></div>
               <div class="absolute top-1/2 w-32 h-32 bg-white/10 rounded-full transform -translate-y-1/2 transition-all duration-700 animate-float-fast"></div>
             </div>
-            
+           
             <div class="relative z-10">
               <h2 class="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
                 Schedule a virtual or presential appointment today
@@ -222,14 +233,14 @@
             </div>
           </div>    
           <!-- Right side with image - Added zoom effect on hover and scroll -->
-          <div 
+          <div
             class="w-full md:w-1/2 h-64 md:h-auto relative overflow-hidden group"
             ref="imageContainer"
           >
-            <img 
+            <img
               ref="zoomImage"
-              src="/src/assets/media/images/landing/contactpic.jpg" 
-              alt="Veterinarian examining a pet" 
+              src="/src/assets/media/images/landing/contactpic.jpg"
+              alt="Veterinarian examining a pet"
               class="w-full h-full object-cover transition-transform duration-700 ease-out"
               :class="{ 'scale-110': isImageVisible }"
             />
@@ -240,12 +251,13 @@
   </div>
 </template>
 
+
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { 
-  StethoscopeIcon, 
-  CalendarIcon, 
-  FileTextIcon, 
+import {
+  StethoscopeIcon,
+  CalendarIcon,
+  FileTextIcon,
   SyringeIcon,
   HeartPulseIcon,
   FlaskConicalIcon,
@@ -254,11 +266,13 @@ import {
   Scissors
 } from 'lucide-vue-next'
 
+
 // Refs for zoom effect
 const ctaSection = ref(null)
 const imageContainer = ref(null)
 const zoomImage = ref(null)
 const isImageVisible = ref(false)
+
 
 // Set up intersection observer for scroll-based animation
 onMounted(() => {
@@ -270,28 +284,28 @@ onMounted(() => {
         isImageVisible.value = false
       }
     })
-  }, { 
+  }, {
     threshold: 0.3, // Trigger when 30% of the element is visible
-    rootMargin: '0px' 
+    rootMargin: '0px'
   })
-  
+ 
   if (ctaSection.value) {
     observer.observe(ctaSection.value)
   }
-  
+ 
   // Clean up observer on component unmount
   onUnmounted(() => {
     if (ctaSection.value) {
       observer.unobserve(ctaSection.value)
     }
   })
-  
+ 
   // Add hover effect for the image container
   if (imageContainer.value) {
     imageContainer.value.addEventListener('mouseenter', () => {
       isImageVisible.value = true
     })
-    
+   
     imageContainer.value.addEventListener('mouseleave', () => {
       // Only reset if not in view (controlled by intersection observer)
       if (!ctaSection.value.classList.contains('in-view')) {
@@ -301,6 +315,7 @@ onMounted(() => {
   }
 })
 </script>
+
 
 <style>
 /* Custom pulse animations with different speeds */
@@ -315,6 +330,7 @@ onMounted(() => {
   }
 }
 
+
 @keyframes pulse-slower {
   0%, 100% {
     transform: scale(1);
@@ -325,6 +341,7 @@ onMounted(() => {
     opacity: 0.7;
   }
 }
+
 
 @keyframes pulse-slowest {
   0%, 100% {
@@ -337,6 +354,7 @@ onMounted(() => {
   }
 }
 
+
 /* Floating animations for circles */
 @keyframes float-slow {
   0%, 100% {
@@ -347,6 +365,7 @@ onMounted(() => {
   }
 }
 
+
 @keyframes float-medium {
   0%, 100% {
     transform: translateY(0) scale(1);
@@ -355,6 +374,7 @@ onMounted(() => {
     transform: translateY(-8px) scale(1.03);
   }
 }
+
 
 @keyframes float-fast {
   0%, 100% {
@@ -365,6 +385,7 @@ onMounted(() => {
   }
 }
 
+
 @keyframes float-slower {
   0%, 100% {
     transform: translateY(0) scale(1);
@@ -374,41 +395,51 @@ onMounted(() => {
   }
 }
 
+
 .animate-pulse-slow {
   animation: pulse-slow 3s infinite ease-in-out;
 }
+
 
 .animate-pulse-slower {
   animation: pulse-slower 4s infinite ease-in-out;
 }
 
+
 .animate-pulse-slowest {
   animation: pulse-slowest 5s infinite ease-in-out;
 }
+
 
 .animate-float-slow {
   animation: float-slow 7s infinite ease-in-out;
 }
 
+
 .animate-float-medium {
   animation: float-medium 5s infinite ease-in-out;
 }
+
 
 .animate-float-fast {
   animation: float-fast 4s infinite ease-in-out;
 }
 
+
 .animate-float-slower {
   animation: float-slower 9s infinite ease-in-out;
 }
+
 
 /* Add hover effect for image container */
 .group:hover img {
   transform: scale(1.1);
 }
 
+
 /* Add class for when element is in view */
 .in-view img {
   transform: scale(1.1);
 }
 </style>
+

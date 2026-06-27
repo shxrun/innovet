@@ -276,7 +276,7 @@
             <input
               type="text"
               v-model="veterinarianForm.title"
-              placeholder="DVM, PhD, etc."
+              placeholder="Dr., PhD, etc."
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-200"
             >
           </div>
@@ -416,7 +416,7 @@
               <h2 class="text-2xl font-bold text-gray-900">{{ `${selectedVeterinarian.firstName} ${selectedVeterinarian.lastName}` }}</h2>
               <p class="text-lg text-blue-600 font-medium flex items-center gap-2">
                 <Award class="w-5 h-5" />
-                {{ selectedVeterinarian.title || 'DVM' }}
+                {{ selectedVeterinarian.title === 'DVM' ? 'Dr.' : selectedVeterinarian.title || 'Dr.' }}
               </p>
             </div>
           </div>
@@ -678,7 +678,7 @@ const veterinarianForm = ref({
   phone: '',
   specialty: '',
   experience: 0,
-  title: 'DVM',
+  title: 'Dr.',
   status: 'Offline',
   consultationMode: 'In-Clinic / Telehealth',
   schedule: 'Mon-Fri, 9AM-5PM',
@@ -786,7 +786,7 @@ const fetchVeterinarians = async () => {
           specialty: 'Small Animal Medicine',
           experience: 5,
           status: 'Available',
-          title: 'DVM',
+          title: 'Dr.',
           role: 'veterinary',
           consultationMode: 'In-Clinic / Telehealth',
           schedule: 'Mon-Fri, 9AM-5PM',
@@ -809,7 +809,7 @@ const fetchVeterinarians = async () => {
           specialty: 'Small Animal Medicine',
           experience: 5,
           status: 'Available',
-          title: 'DVM',
+          title: 'Dr.',
           role: 'veterinary',
           consultationMode: 'In-Clinic / Telehealth',
           schedule: 'Mon-Fri, 9AM-5PM',
@@ -824,7 +824,6 @@ const fetchVeterinarians = async () => {
     }
     
     veterinarians.value = vets
-    console.log(`Fetched ${vets.length} veterinarians`)
     
   } catch (error) {
     console.error('Error fetching veterinarians:', error)
@@ -1015,7 +1014,7 @@ const editVeterinarian = (veterinarian) => {
     phone: veterinarian.phone || '',
     specialty: veterinarian.specialty || '',
     experience: veterinarian.experience || 0,
-    title: veterinarian.title || 'DVM',
+    title: veterinarian.title || 'Dr.',
     status: veterinarian.status || 'Offline',
     consultationMode: veterinarian.consultationMode || 'In-Clinic / Telehealth',
     schedule: veterinarian.schedule || 'Mon-Fri, 9AM-5PM',
@@ -1097,7 +1096,7 @@ const closeForm = () => {
     phone: '',
     specialty: '',
     experience: 0,
-    title: 'DVM',
+    title: 'Dr.',
     status: 'Offline',
     consultationMode: 'In-Clinic / Telehealth',
     schedule: 'Mon-Fri, 9AM-5PM',

@@ -2,7 +2,7 @@ const express = require("express")
 const cors = require("cors")
 const bodyParser = require("body-parser")
 const axios = require("axios")
-const admin = require("firebase-admin")
+// Firebase removed - not needed for core chatbot functionality
 const dotenv = require("dotenv")
 
 // Add these lines at the top of your server.js file, after the existing imports
@@ -467,17 +467,7 @@ app.post("/set-language", (req, res) => {
   })
 })
 
-// Initialize Firebase Admin SDK
-try {
-  const serviceAccount = require("./provet-calapan-3bc89-firebase-adminsdk-3j1s1-2106f30da1.json")
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  })
-  console.log("Firebase initialized successfully")
-} catch (error) {
-  console.error("Firebase initialization error:", error.message)
-  // Continue without Firebase if there's an error
-}
+// Firebase initialization removed - not needed for core chatbot functionality
 
 // Start server
 app.listen(PORT, () => {
