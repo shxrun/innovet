@@ -1,12 +1,12 @@
-InnoVet: AI-Powered Veterinary Disease Prediction System
+InnoVet: Veterinary Disease Prediction System
 
-An intelligent veterinary web application that assists pet owners and veterinarians by predicting possible pet diseases using Machine Learning. The system provides disease predictions based on pet symptoms and helps improve the efficiency of preliminary diagnosis.
+A veterinary web application that assists pet owners and veterinarians by predicting possible pet diseases using Machine Learning. The system provides disease predictions based on pet symptoms and helps improve the efficiency of preliminary diagnosis.
 
 ---
 
 ## 📖 Overview
 
-InnoVet is a full-stack web application that combines Artificial Intelligence and modern web technologies to support veterinary healthcare.
+InnoVet is a web application that combines Artificial Intelligence and modern web technologies to support veterinary healthcare.
 
 The system allows users to enter pet information and symptoms, then utilizes trained machine learning models to predict potential diseases and provide diagnostic insights.
 
@@ -17,7 +17,6 @@ This project was developed as a capstone project to demonstrate the practical ap
 ## ✨ Features
 
 - 🐶 Pet disease prediction using Machine Learning
-- 🤖 AI-powered diagnostic assistance
 - 📋 Pet information management
 - 📊 Disease prediction confidence scores
 - 🔍 Veterinary disease database
@@ -37,6 +36,7 @@ This project was developed as a capstone project to demonstrate the practical ap
 
 ### Backend
 - Python
+- Node
 - Django
 - Django REST Framework
 
@@ -47,7 +47,7 @@ This project was developed as a capstone project to demonstrate the practical ap
 - NumPy
 
 ### Database
-- SQLite
+- Firebase
 
 ### Tools
 - Git
@@ -136,40 +136,5 @@ The machine learning models were trained using veterinary disease datasets conta
 - Symptoms
 - Medical History
 - Disease Labels
-- Clinical Features
 
 ---
-
-## 🎯 Future Improvements
-
-- Mobile Application
-- Cloud Deployment
-- Electronic Medical Records Integration
-- Veterinary Appointment Scheduling
-- Multi-language Support
-- Image-based Disease Detection
-- Explainable AI (XAI)
-
----
-
-## 👨‍💻 Developers
-
-Developed by:
-
-**Sharon Caballero**
-
-Bachelor of Science in Information Technology
-
-Capstone Project
-
----
-
-## 📜 License
-
-This project is intended for educational and research purposes.
-
----
-
-## ⭐ Support
-
-If you find this project helpful, consider giving it a ⭐ on GitHub!
